@@ -14,15 +14,61 @@ import { SavedTemplate } from "./storage";
  * IDs are prefixed with "builtin:" so they can be distinguished from user-saved templates.
  */
 export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
-  // Paste exported templates here. Example:
-  // {
-  //   id: "builtin:basic-4-4",
-  //   name: "Basic 4/4",
-  //   tempo: 120,
-  //   cycleBeats: 4,
-  //   layers: [ ... ],
-  //   savedAt: 0,
-  // },
+  {
+    id: "builtin:random-beats",
+    name: "Random Beats",
+    tempo: 120,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, gap: 1, swing: 0.5 },
+      { name: "Random ", type: "random", steps: 4, pattern: [1, 1, 1, 1], sound: "pip", volume: 0.6, density: 0.35, gap: 0, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
+  {
+    id: "builtin:random-8ths",
+    name: "Random 8ths",
+    tempo: 120,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, gap: 1, swing: 0.5 },
+      { name: "Random ", type: "random", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "tap", volume: 0.6, density: 0.35, gap: 0, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
+  {
+    id: "builtin:random-off-beats",
+    name: "Random off-beats",
+    tempo: 120,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, gap: 1, swing: 0.5 },
+      { name: "Random ", type: "random", steps: 8, pattern: [0, 1, 0, 1, 0, 1, 0, 1], sound: "tap", volume: 0.6, density: 0.4, gap: 0, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
+  {
+    id: "builtin:random-swing-8ths",
+    name: "Random Swing 8ths",
+    tempo: 120,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, gap: 1, swing: 0.5 },
+      { name: "Random ", type: "random", steps: 12, pattern: [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1], sound: "tap", volume: 0.6, density: 0.3, gap: 0, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
+  {
+    id: "builtin:random-swing-off-beats",
+    name: "Random Swing off-beats",
+    tempo: 120,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, gap: 1, swing: 0.5 },
+      { name: "Random ", type: "random", steps: 12, pattern: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], sound: "tap", volume: 0.6, density: 0.4, gap: 0, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
 ];
 
 /** Check if a template is built-in (cannot be deleted/renamed by users) */
