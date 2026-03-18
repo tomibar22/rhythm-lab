@@ -29,7 +29,7 @@ export function TransportBar({
 
   // ── Tap tempo ──
   const tapTimesRef = useRef<number[]>([]);
-  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleTap = useCallback(() => {
     const now = performance.now();

@@ -71,7 +71,6 @@ export class AudioEngine {
   private synths = new Map<string, Tone.Synth | Tone.NoiseSynth>();
   /** Per-layer scheduled events (Part or Loop). */
   private layerEvents = new Map<string, { stop: () => void; dispose: () => void }[]>();
-  private isInitialized = false;
   /** Tick offset for cycle-aligned progress calculation. */
   private cycleAlignTick = 0;
   /** The cycle length the engine is currently using for scheduling. */
@@ -90,7 +89,7 @@ export class AudioEngine {
       await Tone.getContext().resume();
     }
     Tone.getTransport().PPQ = APP_PPQ;
-    this.isInitialized = true;
+    // initialized
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
@@ -466,6 +465,6 @@ export class AudioEngine {
       synth.dispose();
     }
     this.synths.clear();
-    this.isInitialized = false;
+    // reset
   }
 }
