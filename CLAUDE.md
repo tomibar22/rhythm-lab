@@ -7,6 +7,15 @@ A multi-layer rhythmic step sequencer with polyrhythm support, circular visualiz
 pnpm dev  # runs on port 5175
 ```
 
+## Deployment
+
+- **GitHub**: https://github.com/tomibar22/rhythm-lab
+- **Hosting**: Vercel (auto-deploys on push to `main`)
+- **Workflow**: edit locally → `git commit` → `git push` → auto-deploys in ~30s
+- **Standalone project**: has its own `package.json`, `tsconfig.json`, `vite.config.ts` (no monorepo deps)
+- The `vite.config.ts` uses `path.resolve(__dirname)` as `root` so it works both standalone and from the monorepo root via `--config`
+- `tsconfig.json` excludes `vite.config.ts` (Vite handles it separately, avoids needing `@types/node`)
+
 ## Architecture
 
 ```
@@ -30,7 +39,8 @@ App.tsx                      ← wires hook → components
 | `src/engine/types.ts` | `Layer`, `LayerGroup`, `SoundPreset`, `SoundSpec`, `PatternPreset`, `LAYER_COLORS`, `SOUND_PRESETS` |
 | `src/engine/RhythmEngine.ts` | `euclidean(k,n)`, `rotate()`, `invert()`, `getIOIs()`, `getPatternLibrary()` |
 | `src/engine/AudioEngine.ts` | `AudioEngine` class — Tone.js scheduling, synths, cycle boundaries |
-| `src/engine/storage.ts` | `savePattern()`, `saveTemplate()`, `renameTemplate()`, `reorderTemplates()` — localStorage |
+| `src/engine/storage.ts` | `savePattern()`, `saveTemplate()`, `renameTemplate()`, `reorderTemplates()` — localStorage + built-in merge |
+| `src/engine/defaultTemplates.ts` | `BUILT_IN_TEMPLATES` array, `isBuiltIn()`, `exportTemplatesForBundling()` |
 | `src/hooks/useRhythmLab.ts` | Central state hook — layers, transport, smart rescheduling |
 | `src/App.tsx` | Root component, keyboard shortcuts (Space = play) |
 | `src/App.css` | All styling (single CSS file) |
@@ -258,15 +268,31 @@ Each layer row has 3 sections:
 2. **Step bar**: steps −/+, multiplier pills (×1–×8, highlights active), density DragValue (random only)
 3. **Step grid**: clickable step buttons grouped by beat. Manual=toggle onset. Random=toggle allowed. Supports **step painting** (click-drag).
 
-**Drag-to-reorder**: `draggable` is on the drag handle only (not the row — prevents slider conflicts).
+**Drag-and-drop** uses a **custom pointer-event system** (NOT HTML5 DnD, which is unreliable on trackpads):
 
-**Drag-and-drop with groups**:
-- **Layer drag handle** (⠿) — reorders individual layers. Can drag layers between groups, into groups, or out of groups to ungrouped space.
-- **Group drag handle** — separate handle on the group header. Moves the entire group block (all member layers) as a unit via `reorderGroupBlock()`.
-- **Drop into group**: dropping a layer onto a group section calls `moveLayerToGroup(layerId, groupId)`. Layer is appended after the last group member. For empty groups, layer stays near its original visual position.
-- **Drop to ungroup**: dropping a layer onto empty space (outside any group) calls `moveLayerToGroup(layerId, undefined)`. Layer is appended at the end of the flat list.
-- **`reorderLayers(from, to, targetGroupId?)`**: extended with optional `targetGroupId` — `string` = join group, `null` = ungroup, `undefined` = keep current group membership.
-- **Visual feedback**: `dragOverGroupId` state highlights the target group with a dashed outline during drag.
+**How it works:**
+1. **`onPointerDown`** on drag handle → stores drag info in `pointerDrag` ref, does NOT activate yet
+2. **`onPointerMove`** (document-level) → after 5px threshold, activates drag: creates ghost element, sets `draggingId` state, hit-tests with `elementFromPoint` to find drop targets, stores result in `drag.dropTarget`
+3. **`onPointerUp`** (document-level) → executes the drop using `drag.dropTarget` from the last `pointermove` (does NOT re-run `elementFromPoint` — avoids gap/border misses)
+4. Ghost element follows cursor, hidden briefly during `elementFromPoint` calls
+
+**Critical design decision**: `onPointerUp` uses the stored `dropTarget` from the last `pointermove`, NOT a fresh `elementFromPoint` hit-test. This ensures the drop goes exactly where the indicator line was showing, even if the cursor is slightly between rows on release.
+
+**Drop targets** are identified by data attributes:
+- `data-elem-idx` on layer rows and group containers (unified element index)
+- `.top-drop-zone` and `.bottom-drop-zone` for edges
+- `.grid-editor` background for ungrouping
+
+**Visual feedback**:
+- Source element dims (`opacity: 0.25, transform: scale(0.98)`)
+- Drop indicator: neutral gray glowing line (`rgba(255,255,255,0.45)`) with pulse animation
+- Custom ghost label follows cursor (layer color background, white text)
+- Top/bottom drop zones appear only during drag
+
+**Layer drag handle** (⠿) — reorders individual layers. Can drag layers between groups, into groups, or out of groups.
+**Group drag handle** — on group header. Moves entire group block as a unit via `reorderGroupBlock()`.
+**Drop into group**: calls `moveLayerToGroup(layerId, groupId)`.
+**Drop to ungroup**: dropping outside any group calls `moveLayerToGroup(layerId, undefined)`.
 
 ### Step Painting
 Click a step and drag across adjacent steps to paint them all ON or OFF:
@@ -300,6 +326,28 @@ Full composition save/load via "Templates (N)" button:
 - Loading stops playback and replaces all state
 - Default startup template: "Random 8ths"
 
+### Two-Layer Template System (Built-in + User)
+
+Templates come from two sources, merged at read time:
+
+1. **Built-in templates** (`src/engine/defaultTemplates.ts` → `BUILT_IN_TEMPLATES` array)
+   - Baked into the app code, always available to all users
+   - IDs prefixed with `builtin:` — cannot be deleted, renamed, or overwritten
+   - Teacher-curated: add/update by editing the array and pushing to GitHub
+
+2. **User templates** (browser `localStorage` under `rhythm-lab:templates`)
+   - Private to each user's device/browser
+   - Can be created, renamed, deleted, reordered freely
+   - Appear after built-in templates in the list
+
+**How `getSavedTemplates()` works**: returns `[...BUILT_IN_TEMPLATES, ...getUserTemplates()]`. All mutation functions (`saveTemplate`, `deleteTemplate`, `renameTemplate`, `reorderTemplates`) only operate on the user portion. `isBuiltIn(id)` guards all mutations.
+
+### Shipping Templates to Students
+1. Save templates locally in the app (they go to your browser's localStorage)
+2. Open browser console → run `copy(exportTemplatesForBundling())`
+3. Paste output into the `BUILT_IN_TEMPLATES` array in `src/engine/defaultTemplates.ts`
+4. Commit and push → Vercel auto-deploys → students see templates immediately
+
 ## Color Scheme
 
 Warm neutral charcoal — like a dimly lit recording studio. **Not cold blue-black.**
@@ -330,7 +378,7 @@ Design principles:
 1. **Never use `transport.ticks` for boundary alignment** — use mathematically computed ticks
 2. **Skip layer rescheduling when cycle change is pending** — check `engineCycleBeatsRef !== cycleBeatsRef`
 3. **Random layers use a step counter**, not `transport.ticks` derivation (jitter at high tempos)
-4. **`draggable` goes on drag handle only**, never on the row (breaks sliders)
+4. **Drag-and-drop uses pointer events**, not HTML5 DnD (unreliable on trackpads). `onPointerUp` must use stored `dropTarget` from last `pointermove`, never re-run `elementFromPoint`.
 5. **PPQ = 960** everywhere, no floating-point beat positions
 6. **Patterns are 0-indexed `(0|1)[]`** (binary necklace format)
 7. **One synth per layer+sound** — reused, not recreated on each reschedule
