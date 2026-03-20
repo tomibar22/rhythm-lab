@@ -71,6 +71,8 @@ export function GridEditor({
     color: string;
     // Drop target: insert position in element space (0 = before first, N = after last)
     dropInsertIdx: number | null;
+    // If dropping onto a group area, the target group to join
+    dropTargetGroupId: string | null;
   } | null>(null);
 
   const resetDrag = useCallback(() => {
@@ -106,6 +108,7 @@ export function GridEditor({
       sourceElemIdx: elemIdx,
       id, label, color,
       dropInsertIdx: null,
+      dropTargetGroupId: null,
     };
   }, []);
 
@@ -147,6 +150,7 @@ export function GridEditor({
       // Top drop zone → insert at position 0
       if (el.closest(".top-drop-zone")) {
         drag.dropInsertIdx = 0;
+        drag.dropTargetGroupId = null;
         setDropAfterElem(-1);
         return;
       }
@@ -154,9 +158,13 @@ export function GridEditor({
       // Bottom drop zone → insert at end
       if (el.closest(".bottom-drop-zone")) {
         drag.dropInsertIdx = elemMapRef.current.length;
+        drag.dropTargetGroupId = null;
         setDropAfterElem(-2);
         return;
       }
+
+      // Check if cursor is over a group container (for "drop into group")
+      const groupEl = el.closest("[data-group-id]") as HTMLElement | null;
 
       // Find the closest element with data-elem-idx
       const elemEl = el.closest("[data-elem-idx]") as HTMLElement | null;
@@ -165,21 +173,22 @@ export function GridEditor({
         const rect = elemEl.getBoundingClientRect();
         const inTopHalf = e.clientY < rect.top + rect.height / 2;
 
+        // Track whether we're dropping into a group
+        drag.dropTargetGroupId = groupEl?.dataset.groupId ?? null;
+
         if (inTopHalf) {
-          // Insert before this element
           drag.dropInsertIdx = idx;
-          // Show line: below previous element (or top-drop-zone if idx=0)
           setDropAfterElem(idx === 0 ? -1 : idx - 1);
         } else {
-          // Insert after this element
           drag.dropInsertIdx = idx + 1;
           setDropAfterElem(idx);
         }
         return;
       }
 
-      // Over grid editor background → insert at end
+      // Over grid editor background → insert at end, ungroup
       drag.dropInsertIdx = elemMapRef.current.length;
+      drag.dropTargetGroupId = null;
       setDropAfterElem(-2);
     };
 
@@ -198,14 +207,11 @@ export function GridEditor({
 
       if (dropInsertIdx !== null && dropInsertIdx !== sourceElemIdx && dropInsertIdx !== sourceElemIdx + 1) {
         const sourceElem = elemMap[sourceElemIdx];
+        const targetGroupId = drag.dropTargetGroupId;
 
         // Compute target flat-layer index from the element-space insert position.
-        // "insert at element position N" = "insert before element N's first layer"
-        // If N >= elemMap.length, insert at end of layers array.
-        // Skip empty groups (firstLayerIndex === -1) when computing target.
         let targetLayerIdx = currentLayers.length;
         if (dropInsertIdx < elemMap.length) {
-          // Walk forward from dropInsertIdx to find a real element with layers
           for (let k = dropInsertIdx; k < elemMap.length; k++) {
             const te = elemMap[k];
             if (te.type === "layer") {
@@ -220,15 +226,25 @@ export function GridEditor({
 
         if (sourceElem.type === "layer") {
           const from = sourceElem.layerIndex;
-          const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
-          if (from !== to) {
-            onReorderLayers(from, to, null);
+          const sourceLayer = currentLayers[from];
+          const sourceGroupId = sourceLayer?.groupId ?? null;
+
+          if (targetGroupId && targetGroupId !== sourceGroupId) {
+            // Dropping into a different group → join it
+            groupActions.moveLayerToGroup(sourceLayer.id, targetGroupId);
+          } else if (!targetGroupId && sourceGroupId) {
+            // Dropping outside any group → ungroup
+            groupActions.moveLayerToGroup(sourceLayer.id, undefined);
+          } else {
+            // Same group (or both ungrouped) → reorder
+            const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
+            if (from !== to) {
+              onReorderLayers(from, to, targetGroupId);
+            }
           }
         } else if (sourceElem.firstLayerIndex >= 0) {
-          // Group with layers — use reorderGroupBlock
           groupActions.reorderGroupBlock(sourceElem.groupId, targetLayerIdx);
         } else {
-          // Empty group — store visual position
           emptyGroupInserts.current.set(sourceElem.groupId, dropInsertIdx);
           groupActions.update(sourceElem.groupId, {}); // trigger re-render
         }
@@ -338,6 +354,7 @@ export function GridEditor({
         key={`group-${group.id}`}
         className={`layer-group ${group.muted ? "group-muted" : ""} ${draggingId === group.id ? "dragging" : ""} ${dropAfterElem === eIdx ? "drop-below" : ""}`}
         data-elem-idx={eIdx}
+        data-group-id={group.id}
       >
         <GroupHeader
           group={group}
