@@ -275,7 +275,10 @@ export function GridEditor({
           if (sourceElem.firstLayerIndex >= 0) {
             groupActions.reorderGroupBlock(sourceElem.groupId, targetLayerIdx);
           } else {
-            emptyGroupInserts.current.set(sourceElem.groupId, dropInsertIdx);
+            // Adjust for the empty group being removed before re-inserting:
+            // the render builds the element list WITHOUT empty groups, then splices them in.
+            const adjusted = dropInsertIdx > sourceElemIdx ? dropInsertIdx - 1 : dropInsertIdx;
+            emptyGroupInserts.current.set(sourceElem.groupId, adjusted);
             groupActions.update(sourceElem.groupId, {});
           }
         }
