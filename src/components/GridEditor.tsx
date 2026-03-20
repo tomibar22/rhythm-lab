@@ -261,7 +261,19 @@ export function GridEditor({
             // Dropping into a different group → join it, at the computed position
             groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId, targetLayerIdx);
           } else if (!targetGroupId && sourceGroupId) {
-            // Dropping outside any group → ungroup, at the computed position
+            // Dropping outside any group → ungroup, at the computed position.
+            // If this is the last layer in the group, the group becomes empty —
+            // store its current visual position so it stays in place.
+            const membersLeft = currentLayers.filter(l => l.groupId === sourceGroupId && l.id !== draggedLayer.id);
+            if (membersLeft.length === 0) {
+              // Find the group's current element index
+              const groupElemIdx = elemMap.findIndex(e => e.type === "group" && e.groupId === sourceGroupId);
+              if (groupElemIdx >= 0) {
+                // The layer is being removed, so adjust: if it's dropping after the group, group stays put
+                const adjustedGroupPos = dropInsertIdx <= groupElemIdx ? groupElemIdx - 1 : groupElemIdx;
+                emptyGroupInserts.current.set(sourceGroupId, Math.max(0, adjustedGroupPos));
+              }
+            }
             groupActions.moveLayerToGroup(draggedLayer.id, undefined, targetLayerIdx);
           } else {
             // Same group (or both ungrouped) → reorder
