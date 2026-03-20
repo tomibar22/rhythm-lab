@@ -124,8 +124,8 @@ export interface GroupActions {
   duplicate: (groupId: string) => void;
   addLayer: (groupId: string, type: LayerType) => void;
   ungroupLayer: (layerId: string) => void;
-  /** Move a layer to a group (appended at end) or ungroup it (undefined). Also repositions in array. */
-  moveLayerToGroup: (layerId: string, groupId: string | undefined) => void;
+  /** Move a layer to a group or ungroup it (undefined). Optional targetIndex for positioning. */
+  moveLayerToGroup: (layerId: string, groupId: string | undefined, targetIndex?: number) => void;
   /** Move an entire group's layer block to a new position in the flat layers array. */
   reorderGroupBlock: (groupId: string, targetLayerIndex: number) => void;
 }
@@ -753,26 +753,30 @@ export function useRhythmLab() {
     ));
   }, []);
 
-  const moveLayerToGroup = useCallback((layerId: string, targetGroupId: string | undefined) => {
+  const moveLayerToGroup = useCallback((layerId: string, targetGroupId: string | undefined, targetIndex?: number) => {
     setLayers((prev) => {
       const idx = prev.findIndex((l) => l.id === layerId);
       if (idx === -1) return prev;
       const layer = prev[idx];
-      if (layer.groupId === targetGroupId) return prev;
+      if (layer.groupId === targetGroupId && targetIndex === undefined) return prev;
       const newLayers = [...prev];
       const [moved] = newLayers.splice(idx, 1);
       const updated = { ...moved, groupId: targetGroupId };
-      if (targetGroupId) {
-        // Insert after last layer in target group, or keep near original position if group is empty
+
+      if (targetIndex !== undefined) {
+        // Explicit target position provided by drag-and-drop
+        const adjustedTarget = targetIndex > idx ? targetIndex - 1 : targetIndex;
+        newLayers.splice(Math.min(Math.max(0, adjustedTarget), newLayers.length), 0, updated);
+      } else if (targetGroupId) {
+        // No explicit position — append after last layer in target group
         const lastIdx = newLayers.reduce((acc, l, i) => l.groupId === targetGroupId ? i : acc, -1);
         if (lastIdx >= 0) {
           newLayers.splice(lastIdx + 1, 0, updated);
         } else {
-          // Empty group: insert at original position (layer stays where it was visually)
           newLayers.splice(Math.min(idx, newLayers.length), 0, updated);
         }
       } else {
-        // Ungrouped: append at end
+        // Ungrouped, no position — append at end
         newLayers.push(updated);
       }
       return newLayers;

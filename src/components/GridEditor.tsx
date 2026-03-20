@@ -54,6 +54,8 @@ export function GridEditor({
   // dropAfterElem: element index whose bottom edge shows the indicator line.
   // -1 = top drop zone, null = no indicator
   const [dropAfterElem, setDropAfterElem] = useState<number | null>(null);
+  // Highlight group container when dragging a layer over it
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
 
   // Element map: built during render, read during drop
   const elemMapRef = useRef<ElemInfo[]>([]);
@@ -78,6 +80,7 @@ export function GridEditor({
   const resetDrag = useCallback(() => {
     setDropAfterElem(null);
     setDraggingId(null);
+    setDragOverGroupId(null);
     if (pointerDrag.current?.ghostEl) {
       pointerDrag.current.ghostEl.remove();
     }
@@ -147,11 +150,15 @@ export function GridEditor({
 
       if (!el) return;
 
+      // Is the dragged item a layer? (vs a group being dragged)
+      const isDraggingLayer = layersRef.current.some(l => l.id === drag.id);
+
       // Top drop zone → insert at position 0
       if (el.closest(".top-drop-zone")) {
         drag.dropInsertIdx = 0;
         drag.dropTargetGroupId = null;
         setDropAfterElem(-1);
+        setDragOverGroupId(null);
         return;
       }
 
@@ -160,11 +167,13 @@ export function GridEditor({
         drag.dropInsertIdx = elemMapRef.current.length;
         drag.dropTargetGroupId = null;
         setDropAfterElem(-2);
+        setDragOverGroupId(null);
         return;
       }
 
       // Check if cursor is over a group container (for "drop into group")
       const groupEl = el.closest("[data-group-id]") as HTMLElement | null;
+      const hoveredGroupId = groupEl?.dataset.groupId ?? null;
 
       // Find the closest element with data-elem-idx
       const elemEl = el.closest("[data-elem-idx]") as HTMLElement | null;
@@ -174,7 +183,15 @@ export function GridEditor({
         const inTopHalf = e.clientY < rect.top + rect.height / 2;
 
         // Track whether we're dropping into a group
-        drag.dropTargetGroupId = groupEl?.dataset.groupId ?? null;
+        drag.dropTargetGroupId = hoveredGroupId;
+
+        // Highlight the group if dragging a layer over a different group
+        if (isDraggingLayer && hoveredGroupId) {
+          const draggedLayer = layersRef.current.find(l => l.id === drag.id);
+          setDragOverGroupId(draggedLayer?.groupId !== hoveredGroupId ? hoveredGroupId : null);
+        } else {
+          setDragOverGroupId(null);
+        }
 
         if (inTopHalf) {
           drag.dropInsertIdx = idx;
@@ -190,6 +207,7 @@ export function GridEditor({
       drag.dropInsertIdx = elemMapRef.current.length;
       drag.dropTargetGroupId = null;
       setDropAfterElem(-2);
+      setDragOverGroupId(null);
     };
 
     const onPointerUp = (_e: PointerEvent) => {
@@ -240,11 +258,11 @@ export function GridEditor({
           const sourceGroupId = draggedLayer.groupId ?? null;
 
           if (targetGroupId && targetGroupId !== sourceGroupId) {
-            // Dropping into a different group → join it
-            groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId);
+            // Dropping into a different group → join it, at the computed position
+            groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId, targetLayerIdx);
           } else if (!targetGroupId && sourceGroupId) {
-            // Dropping outside any group → ungroup
-            groupActions.moveLayerToGroup(draggedLayer.id, undefined);
+            // Dropping outside any group → ungroup, at the computed position
+            groupActions.moveLayerToGroup(draggedLayer.id, undefined, targetLayerIdx);
           } else {
             // Same group (or both ungrouped) → reorder
             const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
@@ -365,7 +383,7 @@ export function GridEditor({
     const renderGroupElement = (group: LayerGroup, groupLayers: { layer: Layer; index: number }[], eIdx: number) => (
       <div
         key={`group-${group.id}`}
-        className={`layer-group ${group.muted ? "group-muted" : ""} ${draggingId === group.id ? "dragging" : ""} ${dropAfterElem === eIdx ? "drop-below" : ""}`}
+        className={`layer-group ${group.muted ? "group-muted" : ""} ${draggingId === group.id ? "dragging" : ""} ${dropAfterElem === eIdx ? "drop-below" : ""} ${dragOverGroupId === group.id ? "drag-target" : ""}`}
         data-elem-idx={eIdx}
         data-group-id={group.id}
       >
