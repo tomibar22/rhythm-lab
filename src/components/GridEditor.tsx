@@ -205,8 +205,13 @@ export function GridEditor({
       const currentLayers = layersRef.current;
       const { dropInsertIdx, sourceElemIdx } = drag;
 
-      if (dropInsertIdx !== null && dropInsertIdx !== sourceElemIdx && dropInsertIdx !== sourceElemIdx + 1) {
-        const sourceElem = elemMap[sourceElemIdx];
+      const sourceElem = dropInsertIdx !== null ? elemMap[sourceElemIdx] : null;
+      // For layers inside groups, sourceElemIdx is the group's index (shared by all
+      // group members), so the "same position" guard doesn't apply — always allow the drop.
+      const isLayerInGroup = sourceElem?.type === "group" && sourceElem.firstLayerIndex >= 0;
+      const isSamePosition = !isLayerInGroup && (dropInsertIdx === sourceElemIdx || dropInsertIdx === sourceElemIdx + 1);
+
+      if (dropInsertIdx !== null && !isSamePosition && sourceElem) {
         const targetGroupId = drag.dropTargetGroupId;
 
         // Compute target flat-layer index from the element-space insert position.
@@ -224,17 +229,22 @@ export function GridEditor({
           }
         }
 
-        if (sourceElem.type === "layer") {
-          const from = sourceElem.layerIndex;
-          const sourceLayer = currentLayers[from];
-          const sourceGroupId = sourceLayer?.groupId ?? null;
+        // Determine if we're dragging an individual layer or a whole group.
+        // Layers inside groups share the group's sourceElemIdx, so check drag.id
+        // against the layers array to distinguish.
+        const draggedLayer = currentLayers.find(l => l.id === drag.id);
+
+        if (draggedLayer) {
+          // Dragging an individual layer
+          const from = currentLayers.indexOf(draggedLayer);
+          const sourceGroupId = draggedLayer.groupId ?? null;
 
           if (targetGroupId && targetGroupId !== sourceGroupId) {
             // Dropping into a different group → join it
-            groupActions.moveLayerToGroup(sourceLayer.id, targetGroupId);
+            groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId);
           } else if (!targetGroupId && sourceGroupId) {
             // Dropping outside any group → ungroup
-            groupActions.moveLayerToGroup(sourceLayer.id, undefined);
+            groupActions.moveLayerToGroup(draggedLayer.id, undefined);
           } else {
             // Same group (or both ungrouped) → reorder
             const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
@@ -242,11 +252,14 @@ export function GridEditor({
               onReorderLayers(from, to, targetGroupId);
             }
           }
-        } else if (sourceElem.firstLayerIndex >= 0) {
-          groupActions.reorderGroupBlock(sourceElem.groupId, targetLayerIdx);
-        } else {
-          emptyGroupInserts.current.set(sourceElem.groupId, dropInsertIdx);
-          groupActions.update(sourceElem.groupId, {}); // trigger re-render
+        } else if (sourceElem.type === "group") {
+          // Dragging a group (drag.id matches a group, not a layer)
+          if (sourceElem.firstLayerIndex >= 0) {
+            groupActions.reorderGroupBlock(sourceElem.groupId, targetLayerIdx);
+          } else {
+            emptyGroupInserts.current.set(sourceElem.groupId, dropInsertIdx);
+            groupActions.update(sourceElem.groupId, {});
+          }
         }
       }
 
