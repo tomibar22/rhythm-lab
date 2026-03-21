@@ -20,9 +20,9 @@
   --text-secondary: #9b9ba8;
   --text-muted: #5e5e6a;
 
-  /* Accent: refined warm blue-violet — sophisticated, not neon */
-  --accent: #7b6cf0;
-  --accent-dim: rgba(123, 108, 240, 0.15);
+  /* Accent: soft warm white — clean, elegant, understated */
+  --accent: #e8e4ef;
+  --accent-dim: rgba(232, 228, 239, 0.12);
   --danger: #e85454;
 
   --font-sans: "Outfit", system-ui, sans-serif;
@@ -574,7 +574,7 @@ body {
 
 .step-mult-btn.active {
   background: var(--accent);
-  color: white;
+  color: var(--bg-deep);
 }
 
 .ctrl-btn {
@@ -688,7 +688,7 @@ body {
 .add-layer-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(108, 92, 231, 0.05);
+  background: rgba(232, 228, 239, 0.05);
 }
 
 .add-random-btn:hover {
