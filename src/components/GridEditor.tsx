@@ -232,23 +232,35 @@ export function GridEditor({
         if (isGroupContainer) {
           const gid = rowEl.dataset.groupId!;
 
-          // External layer over ANY part of group container → "into-group"
+          const headerEl = rowEl.querySelector(".group-header") as HTMLElement | null;
+          const headerRect = headerEl?.getBoundingClientRect();
+          const isOverHeader = headerRect && e.clientY <= headerRect.bottom;
+
           if (isDraggingLayer) {
             const draggedLayer = layersRef.current.find(l => l.id === drag.id);
-            if (draggedLayer?.groupId !== gid) {
-              drag.dropTarget = { kind: "into-group", groupId: gid };
-              setIndicatorSlot(null);
-              setIndicatorInGroupId(null);
-              setDragOverGroupId(gid);
+            const isExternal = draggedLayer?.groupId !== gid;
+
+            if (isExternal) {
+              if (isOverHeader) {
+                // External layer over header → "into-group" (append to end)
+                drag.dropTarget = { kind: "into-group", groupId: gid };
+                setIndicatorSlot(null);
+                setIndicatorInGroupId(null);
+                setDragOverGroupId(gid);
+              } else {
+                // External layer over body/controls → slot at bottom of group
+                // with indicator line showing exactly where it will land
+                const lastRow = groupLastRowIdx(idx, gid, rowMap);
+                applySlot(lastRow + 1, gid);
+                setDragOverGroupId(gid);
+              }
               return;
             }
           }
 
           // Internal layer or group drag → slot-based positioning
-          const headerEl = rowEl.querySelector(".group-header") as HTMLElement | null;
-          if (headerEl) {
-            const headerRect = headerEl.getBoundingClientRect();
-            if (e.clientY <= headerRect.bottom) {
+          if (headerRect) {
+            if (isOverHeader) {
               // Over header area
               const inTopHalf = e.clientY < headerRect.top + headerRect.height / 2;
               // Top half = above group (ungroup), bottom half = inside group
@@ -641,7 +653,7 @@ export function GridEditor({
       )}
       {renderSections()}
       {draggingId && (
-        <div className={`bottom-drop-zone ${indicatorSlot === rowMapRef.current.length ? "active" : ""}`} />
+        <div className={`bottom-drop-zone ${indicatorSlot === rowMapRef.current.length && !indicatorInGroupId ? "active" : ""}`} />
       )}
       <div className="add-layer-controls">
         <button className="add-layer-btn" onClick={() => onAddLayer("manual")}>
