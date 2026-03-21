@@ -241,19 +241,14 @@ export function GridEditor({
             const isExternal = draggedLayer?.groupId !== gid;
 
             if (isExternal) {
-              if (isOverHeader) {
-                // External layer over header → "into-group" (append to end)
-                drag.dropTarget = { kind: "into-group", groupId: gid };
-                setIndicatorSlot(null);
-                setIndicatorInGroupId(null);
-                setDragOverGroupId(gid);
-              } else {
-                // External layer over body/controls → slot at bottom of group
-                // with indicator line showing exactly where it will land
-                const lastRow = groupLastRowIdx(idx, gid, rowMap);
-                applySlot(lastRow + 1, gid);
-                setDragOverGroupId(gid);
-              }
+              // External layer over ANY part of group container → "into-group"
+              // (append to end). The group highlight is the visual cue.
+              // For precise positioning within the group, the user can hover
+              // over individual layer rows (handled by the "Regular row" branch).
+              drag.dropTarget = { kind: "into-group", groupId: gid };
+              setIndicatorSlot(null);
+              setIndicatorInGroupId(null);
+              setDragOverGroupId(gid);
               return;
             }
           }
