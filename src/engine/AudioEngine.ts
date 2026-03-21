@@ -64,7 +64,7 @@ function humanizeVelocity(
   // ±6% random variation — breaks machine-gun effect
   const jitter = 1.0 + (Math.random() - 0.5) * 0.12;
 
-  return Math.min(1.0, Math.max(0.05, baseVelocity * accentScale * jitter));
+  return Math.min(1.0, Math.max(0, baseVelocity * accentScale * jitter));
 }
 
 export class AudioEngine {
@@ -338,9 +338,11 @@ export class AudioEngine {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const part = new Tone.Part((time: number, event: any) => {
-      const rawVol = (event.velocity / 127) * layerVolume;
-      const vol = humanizeVelocity(rawVol, event.step, layer.steps, cycleBeats);
-      this.triggerSynth(synth, spec, time, vol);
+      if (layerVolume > 0) {
+        const rawVol = (event.velocity / 127) * layerVolume;
+        const vol = humanizeVelocity(rawVol, event.step, layer.steps, cycleBeats);
+        this.triggerSynth(synth, spec, time, vol);
+      }
       Tone.getDraw().schedule(() => {
         onStep(layerId, event.step);
       }, time);
@@ -395,10 +397,12 @@ export class AudioEngine {
 
         // pattern[step] === 0 means "forbidden" — never fires
         if (allowedMask[currentStep] === 1 && Math.random() < density) {
-          const cycleBeats = cycleTicks / APP_PPQ;
-          const rawVol = (100 / 127) * layerVolume;
-          const vol = humanizeVelocity(rawVol, currentStep, steps, cycleBeats);
-          this.triggerSynth(synth, spec, triggerTime, vol);
+          if (layerVolume > 0) {
+            const cycleBeats = cycleTicks / APP_PPQ;
+            const rawVol = (100 / 127) * layerVolume;
+            const vol = humanizeVelocity(rawVol, currentStep, steps, cycleBeats);
+            this.triggerSynth(synth, spec, triggerTime, vol);
+          }
           Tone.getDraw().schedule(() => {
             onStep(layerId, currentStep);
           }, triggerTime);
