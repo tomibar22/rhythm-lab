@@ -140,7 +140,8 @@ body {
 }
 
 .play-btn.playing:hover {
-  background: #8b7ef5;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
 }
 
 @keyframes pulse-glow {
