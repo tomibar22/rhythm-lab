@@ -155,7 +155,15 @@ export function TransportBar({
         onClick={onTogglePlay}
         aria-label={isPlaying ? "Stop" : "Play"}
       >
-        {isPlaying ? "■" : "▶"}
+        {isPlaying ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+            <rect x="1" y="1" width="16" height="16" rx="3" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style={{ marginLeft: 2 }}>
+            <path d="M4 2.5a1 1 0 0 1 1.5-.87l12 7a1 1 0 0 1 0 1.74l-12 7A1 1 0 0 1 4 16.5v-14z" />
+          </svg>
+        )}
       </button>
 
       <div
