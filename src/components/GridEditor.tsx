@@ -220,46 +220,35 @@ export function GridEditor({
         const isGroupContainer = !!rowEl.dataset.groupId;
 
         if (isGroupContainer) {
-          // Group container — use header rect for precise detection
           const gid = rowEl.dataset.groupId!;
-          const headerEl = rowEl.querySelector(".group-header") as HTMLElement | null;
 
+          // External layer over ANY part of group container → "into-group"
+          if (isDraggingLayer) {
+            const draggedLayer = layersRef.current.find(l => l.id === drag.id);
+            if (draggedLayer?.groupId !== gid) {
+              drag.dropTarget = { kind: "into-group", groupId: gid };
+              setIndicatorSlot(null);
+              setDragOverGroupId(gid);
+              return;
+            }
+          }
+
+          // Internal layer or group drag → slot-based positioning
+          const headerEl = rowEl.querySelector(".group-header") as HTMLElement | null;
           if (headerEl) {
             const headerRect = headerEl.getBoundingClientRect();
             if (e.clientY <= headerRect.bottom) {
-              // On the group header
-              if (isDraggingLayer) {
-                const draggedLayer = layersRef.current.find(l => l.id === drag.id);
-                if (draggedLayer?.groupId !== gid) {
-                  // Layer from outside → "into-group"
-                  drag.dropTarget = { kind: "into-group", groupId: gid };
-                  setIndicatorSlot(null);
-                  setDragOverGroupId(gid);
-                  return;
-                }
-              }
-              // Same-group layer or group drag → slot above/below header
               const inTopHalf = e.clientY < headerRect.top + headerRect.height / 2;
               applySlot(inTopHalf ? idx : idx + 1);
-              setDragOverGroupId(null);
             } else {
-              // Below header (body/add-buttons area) → slot after group's last row
               const lastRow = groupLastRowIdx(idx, gid, rowMap);
               applySlot(lastRow + 1);
-              // Highlight group if dragging external layer into body area
-              if (isDraggingLayer) {
-                const draggedLayer = layersRef.current.find(l => l.id === drag.id);
-                setDragOverGroupId(draggedLayer?.groupId !== gid ? gid : null);
-              } else {
-                setDragOverGroupId(null);
-              }
             }
           } else {
-            // Fallback for headerless group (shouldn't happen)
             const rect = rowEl.getBoundingClientRect();
             applySlot(e.clientY < rect.top + rect.height / 2 ? idx : idx + 1);
-            setDragOverGroupId(null);
           }
+          setDragOverGroupId(null);
           return;
         }
 
@@ -280,13 +269,29 @@ export function GridEditor({
         return;
       }
 
-      // Grid editor background — check if above or below content
-      const firstRowEl = document.querySelector("[data-row-idx]") as HTMLElement | null;
-      if (firstRowEl && e.clientY < firstRowEl.getBoundingClientRect().top) {
-        applySlot(0);
-      } else {
-        applySlot(rowMap.length);
+      // Grid editor background — find nearest slot by Y-scanning row elements
+      const allRowEls = Array.from(document.querySelectorAll("[data-row-idx]"))
+        .map(r => {
+          const htmlEl = r as HTMLElement;
+          const rIdx = parseInt(htmlEl.dataset.rowIdx!, 10);
+          // For group containers, use the header rect (group rect is too tall)
+          let rRect = htmlEl.getBoundingClientRect();
+          if (htmlEl.dataset.groupId) {
+            const hdr = htmlEl.querySelector(".group-header");
+            if (hdr) rRect = hdr.getBoundingClientRect();
+          }
+          return { idx: rIdx, rect: rRect };
+        })
+        .sort((a, b) => a.rect.top - b.rect.top);
+
+      let bestSlot = rowMap.length;
+      for (const { idx: rIdx, rect: rRect } of allRowEls) {
+        if (e.clientY < rRect.top + rRect.height / 2) {
+          bestSlot = rIdx;
+          break;
+        }
       }
+      applySlot(bestSlot);
       setDragOverGroupId(null);
     };
 
@@ -536,7 +541,8 @@ export function GridEditor({
     for (const section of sections) {
       if (section.type === "layer") {
         // Standalone layer: show drop-below for slot = rowIdx + 1
-        const dp = indicatorSlot === rowIdx + 1 ? "below" as const : null;
+        // Guard: slot N (bottom) is handled exclusively by bottom-drop-zone
+        const dp = indicatorSlot === rowIdx + 1 && indicatorSlot !== rowMap.length ? "below" as const : null;
         elements.push(renderLayerRow(section.layer, section.layerIndex, rowIdx, false, dp));
         rowIdx++;
       } else {
@@ -570,7 +576,8 @@ export function GridEditor({
         }
 
         // Group container shows drop-below only at the outer boundary
-        const showGroupDropBelow = indicatorSlot === groupLastRow + 1;
+        // Guard: slot N (bottom) is handled exclusively by bottom-drop-zone
+        const showGroupDropBelow = indicatorSlot === groupLastRow + 1 && indicatorSlot !== rowMap.length;
 
         elements.push(
           <div
