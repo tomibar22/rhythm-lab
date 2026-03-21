@@ -188,8 +188,11 @@ export function GridEditor({
       const isDraggingLayer = layersRef.current.some(l => l.id === drag.id);
 
       // Helper: apply slot with self-drop guard
+      // Only block slots that are truly no-ops (before/within the dragged rows).
+      // Slot after the last dragged row (dragRange[1]+1) is NOT always a no-op
+      // (e.g., ungrouping a layer by moving it below its group).
       const applySlot = (slot: number) => {
-        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1] + 1) {
+        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1]) {
           drag.dropTarget = null;
           setIndicatorSlot(null);
         } else {
@@ -347,10 +350,19 @@ export function GridEditor({
             if (above.kind === "group-header") {
               targetGroupId = above.groupId;
             }
+            // At group boundary: if the dragged layer is from the group above,
+            // keep it in the group (internal reorder to last position)
+            if (!targetGroupId && aboveGroup && draggedLayer?.groupId === aboveGroup) {
+              targetGroupId = aboveGroup;
+            }
           } else if (slotIndex > 0 && slotIndex === rowMap.length) {
             const lastRow = rowMap[rowMap.length - 1];
             if (lastRow.kind === "group-header") {
               targetGroupId = lastRow.kind === "group-header" ? lastRow.groupId : null;
+            }
+            // At bottom: if dragged layer is from the last group, keep it there
+            if (!targetGroupId && lastRow.kind === "layer" && lastRow.groupId && draggedLayer?.groupId === lastRow.groupId) {
+              targetGroupId = lastRow.groupId;
             }
           }
 
@@ -565,9 +577,19 @@ export function GridEditor({
             if (isFirst && indicatorSlot === layerRowIdx) {
               dp = "above";
             }
-            // Show drop-below for internal slots (not at outer group boundary)
-            if (indicatorSlot === layerRowIdx + 1 && !isLast) {
-              dp = "below";
+            // Show drop-below for internal slots
+            if (indicatorSlot === layerRowIdx + 1) {
+              if (!isLast) {
+                // Not last layer — always show
+                dp = "below";
+              } else {
+                // Last layer: show drop-below only for internal reorders
+                // (when dragging a layer that belongs to this group)
+                const draggedLayer = draggingId ? layers.find(l => l.id === draggingId) : null;
+                if (draggedLayer?.groupId === group.id) {
+                  dp = "below";
+                }
+              }
             }
 
             layerElements.push(renderLayerRow(gl, gi, layerRowIdx, true, dp));
@@ -576,8 +598,10 @@ export function GridEditor({
         }
 
         // Group container shows drop-below only at the outer boundary
-        // Guard: slot N (bottom) is handled exclusively by bottom-drop-zone
-        const showGroupDropBelow = indicatorSlot === groupLastRow + 1 && indicatorSlot !== rowMap.length;
+        // Guard 1: slot N (bottom) is handled exclusively by bottom-drop-zone
+        // Guard 2: internal reorders use the last layer's drop-below instead
+        const isInternalReorder = draggingId ? layers.some(l => l.id === draggingId && l.groupId === group.id) : false;
+        const showGroupDropBelow = indicatorSlot === groupLastRow + 1 && indicatorSlot !== rowMap.length && !isInternalReorder;
 
         elements.push(
           <div
