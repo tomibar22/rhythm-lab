@@ -945,8 +945,8 @@ body {
   transform: scale(0.98);
 }
 
-/* Drop position indicator — single line below the target element.
-   We only use drop-below (never drop-above) to avoid double lines in gaps. */
+/* Drop position indicator — line above or below the target element.
+   Each row can show at most one indicator (above OR below, never both). */
 .layer-row.drop-below::after,
 .layer-group.drop-below::after {
   content: "";
@@ -954,6 +954,22 @@ body {
   left: 0;
   right: 0;
   bottom: -2px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.15), 0 0 4px rgba(255, 255, 255, 0.1);
+  z-index: 10;
+  pointer-events: none;
+  animation: drop-line-pulse 0.8s ease-in-out infinite;
+}
+
+.layer-row.drop-above::before,
+.layer-group.drop-above::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
   height: 3px;
   background: rgba(255, 255, 255, 0.45);
   border-radius: 2px;

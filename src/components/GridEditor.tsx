@@ -23,6 +23,21 @@ interface GridEditorProps {
   onReorderLayers: (fromIndex: number, toIndex: number, targetGroupId?: string | null) => void;
 }
 
+// ── VisualRow-based drag system ──
+// Every visible row (layer, group-header, layer-inside-group) gets its own
+// sequential `data-row-idx`. Drop targets are "slots" — gaps between rows.
+// Slot 0 = before first row, slot N = after last row.
+// This eliminates the bugs caused by layers-inside-groups sharing indices.
+
+type VisualRow =
+  | { kind: "layer"; layerId: string; layerIndex: number; groupId: string | null }
+  | { kind: "group-header"; groupId: string; firstLayerIndex: number; layerCount: number };
+
+type DropTarget =
+  | { kind: "slot"; slotIndex: number }
+  | { kind: "into-group"; groupId: string }
+  | null;
+
 export function GridEditor({
   layers,
   groups,
@@ -41,24 +56,17 @@ export function GridEditor({
   onClearPattern,
   onReorderLayers,
 }: GridEditorProps) {
-  // ── Element-index based drag system ──
-  // Every rendered item (layer or group) gets a `data-elem-idx`.
-  // Drag/drop operates entirely in this unified element-index space.
-  // Only at drop time do we convert to flat-layer operations.
-
-  type ElemInfo =
-    | { type: "layer"; layerIndex: number; groupId: string | null }
-    | { type: "group"; groupId: string; firstLayerIndex: number; lastLayerIndex: number };
-
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  // dropAfterElem: element index whose bottom edge shows the indicator line.
-  // -1 = top drop zone, null = no indicator
-  const [dropAfterElem, setDropAfterElem] = useState<number | null>(null);
-  // Highlight group container when dragging a layer over it
+  // Slot index for the drop indicator line. null = no indicator.
+  const [indicatorSlot, setIndicatorSlot] = useState<number | null>(null);
+  // Highlight group when dragging a layer into it
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
 
-  // Element map: built during render, read during drop
-  const elemMapRef = useRef<ElemInfo[]>([]);
+  // Visual row map: built during render, read during drag/drop
+  const rowMapRef = useRef<VisualRow[]>([]);
+
+  // Track where empty groups should render (row-level position)
+  const emptyGroupInserts = useRef<Map<string, number>>(new Map());
 
   // Pointer drag tracking
   const pointerDrag = useRef<{
@@ -67,18 +75,15 @@ export function GridEditor({
     startY: number;
     active: boolean;
     ghostEl: HTMLElement | null;
-    sourceElemIdx: number;
     id: string;
     label: string;
     color: string;
-    // Drop target: insert position in element space (0 = before first, N = after last)
-    dropInsertIdx: number | null;
-    // If dropping onto a group area, the target group to join
-    dropTargetGroupId: string | null;
+    // The stored drop target from the last pointermove
+    dropTarget: DropTarget;
   } | null>(null);
 
   const resetDrag = useCallback(() => {
-    setDropAfterElem(null);
+    setIndicatorSlot(null);
     setDraggingId(null);
     setDragOverGroupId(null);
     if (pointerDrag.current?.ghostEl) {
@@ -87,14 +92,34 @@ export function GridEditor({
     pointerDrag.current = null;
   }, []);
 
-  // Refs for values needed in pointer event handlers (avoid stale closures)
   const layersRef = useRef(layers);
   layersRef.current = layers;
 
-  // Start a pointer-based drag from a drag handle
+  // Determine which row indices the dragged item occupies
+  const getDraggedRowRange = useCallback((dragId: string, rowMap: VisualRow[]): [number, number] | null => {
+    const currentLayers = layersRef.current;
+    const draggedLayer = currentLayers.find(l => l.id === dragId);
+    if (draggedLayer) {
+      // Single layer
+      const idx = rowMap.findIndex(r => r.kind === "layer" && r.layerId === dragId);
+      return idx >= 0 ? [idx, idx] : null;
+    }
+    // Group: find header + all member layers
+    const headerIdx = rowMap.findIndex(r => r.kind === "group-header" && r.groupId === dragId);
+    if (headerIdx < 0) return null;
+    let lastIdx = headerIdx;
+    for (let i = headerIdx + 1; i < rowMap.length; i++) {
+      if (rowMap[i].kind === "layer" && (rowMap[i] as { groupId: string | null }).groupId === dragId) {
+        lastIdx = i;
+      } else {
+        break;
+      }
+    }
+    return [headerIdx, lastIdx];
+  }, []);
+
   const handleDragHandlePointerDown = useCallback((
     e: React.PointerEvent,
-    elemIdx: number,
     id: string,
     label: string,
     color: string,
@@ -108,10 +133,8 @@ export function GridEditor({
       startY: e.clientY,
       active: false,
       ghostEl: null,
-      sourceElemIdx: elemIdx,
       id, label, color,
-      dropInsertIdx: null,
-      dropTargetGroupId: null,
+      dropTarget: null,
     };
   }, []);
 
@@ -143,70 +166,104 @@ export function GridEditor({
         drag.ghostEl.style.top = (e.clientY - 10) + "px";
       }
 
-      // Hit-test using elementFromPoint
+      // Hit-test
       if (drag.ghostEl) drag.ghostEl.style.display = "none";
       const el = document.elementFromPoint(e.clientX, e.clientY);
       if (drag.ghostEl) drag.ghostEl.style.display = "";
-
       if (!el) return;
 
-      // Is the dragged item a layer? (vs a group being dragged)
+      const rowMap = rowMapRef.current;
+      const dragRange = getDraggedRowRange(drag.id, rowMap);
       const isDraggingLayer = layersRef.current.some(l => l.id === drag.id);
 
-      // Top drop zone → insert at position 0
+      // Top drop zone
       if (el.closest(".top-drop-zone")) {
-        drag.dropInsertIdx = 0;
-        drag.dropTargetGroupId = null;
-        setDropAfterElem(-1);
-        setDragOverGroupId(null);
+        const slot = 0;
+        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1] + 1) {
+          // No-op: dropping on self
+          drag.dropTarget = null;
+          setIndicatorSlot(null);
+          setDragOverGroupId(null);
+        } else {
+          drag.dropTarget = { kind: "slot", slotIndex: 0 };
+          setIndicatorSlot(0);
+          setDragOverGroupId(null);
+        }
         return;
       }
 
-      // Bottom drop zone → insert at end
+      // Bottom drop zone
       if (el.closest(".bottom-drop-zone")) {
-        drag.dropInsertIdx = elemMapRef.current.length;
-        drag.dropTargetGroupId = null;
-        setDropAfterElem(-2);
-        setDragOverGroupId(null);
+        const slot = rowMap.length;
+        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1] + 1) {
+          drag.dropTarget = null;
+          setIndicatorSlot(null);
+          setDragOverGroupId(null);
+        } else {
+          drag.dropTarget = { kind: "slot", slotIndex: rowMap.length };
+          setIndicatorSlot(rowMap.length);
+          setDragOverGroupId(null);
+        }
         return;
       }
 
-      // Check if cursor is over a group container (for "drop into group")
-      const groupEl = el.closest("[data-group-id]") as HTMLElement | null;
-      const hoveredGroupId = groupEl?.dataset.groupId ?? null;
-
-      // Find the closest element with data-elem-idx
-      const elemEl = el.closest("[data-elem-idx]") as HTMLElement | null;
-      if (elemEl) {
-        const idx = parseInt(elemEl.dataset.elemIdx!, 10);
-        const rect = elemEl.getBoundingClientRect();
+      // Find row element
+      const rowEl = el.closest("[data-row-idx]") as HTMLElement | null;
+      if (rowEl) {
+        const idx = parseInt(rowEl.dataset.rowIdx!, 10);
+        const rect = rowEl.getBoundingClientRect();
         const inTopHalf = e.clientY < rect.top + rect.height / 2;
+        const slot = inTopHalf ? idx : idx + 1;
 
-        // Track whether we're dropping into a group
-        drag.dropTargetGroupId = hoveredGroupId;
+        // Check if over a group container
+        const groupEl = el.closest("[data-group-id]") as HTMLElement | null;
+        const hoveredGroupId = groupEl?.dataset.groupId ?? null;
 
-        // Highlight the group if dragging a layer over a different group
+        // If dragging a layer and hovering over the group header's middle area,
+        // treat as "into-group" (highlight the group, don't show slot indicator)
         if (isDraggingLayer && hoveredGroupId) {
+          const row = rowMap[idx];
+          if (row?.kind === "group-header" && row.groupId === hoveredGroupId) {
+            const draggedLayer = layersRef.current.find(l => l.id === drag.id);
+            if (draggedLayer?.groupId !== hoveredGroupId) {
+              drag.dropTarget = { kind: "into-group", groupId: hoveredGroupId };
+              setIndicatorSlot(null);
+              setDragOverGroupId(hoveredGroupId);
+              return;
+            }
+          }
+          // Dragging a layer near/within a different group → highlight it
           const draggedLayer = layersRef.current.find(l => l.id === drag.id);
-          setDragOverGroupId(draggedLayer?.groupId !== hoveredGroupId ? hoveredGroupId : null);
+          if (draggedLayer?.groupId !== hoveredGroupId) {
+            setDragOverGroupId(hoveredGroupId);
+          } else {
+            setDragOverGroupId(null);
+          }
         } else {
           setDragOverGroupId(null);
         }
 
-        if (inTopHalf) {
-          drag.dropInsertIdx = idx;
-          setDropAfterElem(idx === 0 ? -1 : idx - 1);
-        } else {
-          drag.dropInsertIdx = idx + 1;
-          setDropAfterElem(idx);
+        // Self-drop guard: if slot is within the dragged item's range, it's a no-op
+        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1] + 1) {
+          drag.dropTarget = null;
+          setIndicatorSlot(null);
+          return;
         }
+
+        drag.dropTarget = { kind: "slot", slotIndex: slot };
+        setIndicatorSlot(slot);
         return;
       }
 
       // Over grid editor background → insert at end, ungroup
-      drag.dropInsertIdx = elemMapRef.current.length;
-      drag.dropTargetGroupId = null;
-      setDropAfterElem(-2);
+      const slot = rowMap.length;
+      if (dragRange && slot >= dragRange[0] && slot <= dragRange[1] + 1) {
+        drag.dropTarget = null;
+        setIndicatorSlot(null);
+      } else {
+        drag.dropTarget = { kind: "slot", slotIndex: rowMap.length };
+        setIndicatorSlot(rowMap.length);
+      }
       setDragOverGroupId(null);
     };
 
@@ -219,79 +276,120 @@ export function GridEditor({
         return;
       }
 
-      const elemMap = elemMapRef.current;
+      const rowMap = rowMapRef.current;
       const currentLayers = layersRef.current;
-      const { dropInsertIdx, sourceElemIdx } = drag;
+      const target = drag.dropTarget;
 
-      const sourceElem = dropInsertIdx !== null ? elemMap[sourceElemIdx] : null;
-      // For layers inside groups, sourceElemIdx is the group's index (shared by all
-      // group members), so the "same position" guard doesn't apply — always allow the drop.
-      const isLayerInGroup = sourceElem?.type === "group" && sourceElem.firstLayerIndex >= 0;
-      const isSamePosition = !isLayerInGroup && (dropInsertIdx === sourceElemIdx || dropInsertIdx === sourceElemIdx + 1);
-
-      if (dropInsertIdx !== null && !isSamePosition && sourceElem) {
-        const targetGroupId = drag.dropTargetGroupId;
-
-        // Compute target flat-layer index from the element-space insert position.
-        let targetLayerIdx = currentLayers.length;
-        if (dropInsertIdx < elemMap.length) {
-          for (let k = dropInsertIdx; k < elemMap.length; k++) {
-            const te = elemMap[k];
-            if (te.type === "layer") {
-              targetLayerIdx = te.layerIndex;
-              break;
-            } else if (te.firstLayerIndex >= 0) {
-              targetLayerIdx = te.firstLayerIndex;
-              break;
-            }
-          }
-        }
-
-        // Determine if we're dragging an individual layer or a whole group.
-        // Layers inside groups share the group's sourceElemIdx, so check drag.id
-        // against the layers array to distinguish.
+      if (target) {
         const draggedLayer = currentLayers.find(l => l.id === drag.id);
 
-        if (draggedLayer) {
-          // Dragging an individual layer
-          const from = currentLayers.indexOf(draggedLayer);
-          const sourceGroupId = draggedLayer.groupId ?? null;
+        if (target.kind === "into-group" && draggedLayer) {
+          // Drop layer into group (append at end)
+          groupActions.moveLayerToGroup(draggedLayer.id, target.groupId);
+        } else if (target.kind === "slot") {
+          const slotIndex = target.slotIndex;
 
-          if (targetGroupId && targetGroupId !== sourceGroupId) {
-            // Dropping into a different group → join it, at the computed position
-            groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId, targetLayerIdx);
-          } else if (!targetGroupId && sourceGroupId) {
-            // Dropping outside any group → ungroup, at the computed position.
-            // If this is the last layer in the group, the group becomes empty —
-            // store its current visual position so it stays in place.
-            const membersLeft = currentLayers.filter(l => l.groupId === sourceGroupId && l.id !== draggedLayer.id);
-            if (membersLeft.length === 0) {
-              // Find the group's current element index
-              const groupElemIdx = elemMap.findIndex(e => e.type === "group" && e.groupId === sourceGroupId);
-              if (groupElemIdx >= 0) {
-                // The layer is being removed, so adjust: if it's dropping after the group, group stays put
-                const adjustedGroupPos = dropInsertIdx <= groupElemIdx ? groupElemIdx - 1 : groupElemIdx;
-                emptyGroupInserts.current.set(sourceGroupId, Math.max(0, adjustedGroupPos));
+          // Convert slot index → flat layer index
+          // The row at slotIndex (or the next valid one) tells us the target position
+          let targetLayerIdx = currentLayers.length;
+          if (slotIndex < rowMap.length) {
+            const row = rowMap[slotIndex];
+            if (row.kind === "layer") {
+              targetLayerIdx = row.layerIndex;
+            } else if (row.kind === "group-header") {
+              targetLayerIdx = row.firstLayerIndex >= 0 ? row.firstLayerIndex : currentLayers.length;
+              // Look ahead to find next real layer after this empty group header
+              if (row.firstLayerIndex < 0) {
+                for (let k = slotIndex + 1; k < rowMap.length; k++) {
+                  const r = rowMap[k];
+                  if (r.kind === "layer") { targetLayerIdx = r.layerIndex; break; }
+                  if (r.kind === "group-header" && r.firstLayerIndex >= 0) { targetLayerIdx = r.firstLayerIndex; break; }
+                }
               }
             }
-            groupActions.moveLayerToGroup(draggedLayer.id, undefined, targetLayerIdx);
-          } else {
-            // Same group (or both ungrouped) → reorder
-            const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
-            if (from !== to) {
-              onReorderLayers(from, to, targetGroupId);
+          }
+
+          // Determine the target group from the slot context
+          // If the slot is between rows that belong to the same group, the target is that group
+          let targetGroupId: string | null = null;
+          if (slotIndex > 0 && slotIndex < rowMap.length) {
+            const above = rowMap[slotIndex - 1];
+            const below = rowMap[slotIndex];
+            // If both are in the same group, target is that group
+            const aboveGroup = above.kind === "layer" ? above.groupId : (above.kind === "group-header" ? above.groupId : null);
+            const belowGroup = below.kind === "layer" ? below.groupId : (below.kind === "group-header" ? below.groupId : null);
+            if (aboveGroup && aboveGroup === belowGroup) {
+              targetGroupId = aboveGroup;
+            }
+            // If slot is right after a group-header, target is that group
+            if (above.kind === "group-header") {
+              targetGroupId = above.groupId;
+            }
+          } else if (slotIndex > 0 && slotIndex === rowMap.length) {
+            // After the last row — check if last row is in a group
+            const lastRow = rowMap[rowMap.length - 1];
+            const lastGroup = lastRow.kind === "layer" ? lastRow.groupId : (lastRow.kind === "group-header" ? lastRow.groupId : null);
+            // Only target the group if the last row is a group-header (empty group at bottom)
+            if (lastRow.kind === "group-header") {
+              targetGroupId = lastGroup;
             }
           }
-        } else if (sourceElem.type === "group") {
-          // Dragging a group (drag.id matches a group, not a layer)
-          if (sourceElem.firstLayerIndex >= 0) {
-            groupActions.reorderGroupBlock(sourceElem.groupId, targetLayerIdx);
+
+          if (draggedLayer) {
+            // Dragging an individual layer
+            const from = currentLayers.indexOf(draggedLayer);
+            const sourceGroupId = draggedLayer.groupId ?? null;
+
+            if (targetGroupId && targetGroupId !== sourceGroupId) {
+              groupActions.moveLayerToGroup(draggedLayer.id, targetGroupId, targetLayerIdx);
+            } else if (!targetGroupId && sourceGroupId) {
+              // Ungrouping: if last layer, store group position
+              const membersLeft = currentLayers.filter(l => l.groupId === sourceGroupId && l.id !== draggedLayer.id);
+              if (membersLeft.length === 0) {
+                const groupRowIdx = rowMap.findIndex(r => r.kind === "group-header" && r.groupId === sourceGroupId);
+                if (groupRowIdx >= 0) {
+                  // Convert to a section-level position for emptyGroupInserts
+                  // Count how many top-level sections are before this row
+                  let sectionIdx = 0;
+                  for (let k = 0; k < groupRowIdx; k++) {
+                    const r = rowMap[k];
+                    if (r.kind === "group-header" || (r.kind === "layer" && !r.groupId)) {
+                      sectionIdx++;
+                    }
+                  }
+                  const adjustedPos = slotIndex <= groupRowIdx ? sectionIdx : sectionIdx;
+                  emptyGroupInserts.current.set(sourceGroupId, Math.max(0, adjustedPos));
+                }
+              }
+              groupActions.moveLayerToGroup(draggedLayer.id, undefined, targetLayerIdx);
+            } else {
+              // Same group or both ungrouped → reorder
+              const to = targetLayerIdx > from ? targetLayerIdx - 1 : targetLayerIdx;
+              if (from !== to) {
+                onReorderLayers(from, to, targetGroupId);
+              }
+            }
           } else {
-            // Adjust for the empty group being removed before re-inserting:
-            // the render builds the element list WITHOUT empty groups, then splices them in.
-            const adjusted = dropInsertIdx > sourceElemIdx ? dropInsertIdx - 1 : dropInsertIdx;
-            emptyGroupInserts.current.set(sourceElem.groupId, adjusted);
-            groupActions.update(sourceElem.groupId, {});
+            // Dragging a group
+            const headerRow = rowMap.find(r => r.kind === "group-header" && r.groupId === drag.id);
+            if (headerRow && headerRow.kind === "group-header") {
+              if (headerRow.firstLayerIndex >= 0) {
+                groupActions.reorderGroupBlock(headerRow.groupId, targetLayerIdx);
+              } else {
+                // Empty group: compute section-level position
+                let sectionIdx = 0;
+                for (let k = 0; k < slotIndex && k < rowMap.length; k++) {
+                  const r = rowMap[k];
+                  if (r.kind === "group-header" || (r.kind === "layer" && !r.groupId)) {
+                    if (!(r.kind === "group-header" && r.groupId === drag.id)) {
+                      sectionIdx++;
+                    }
+                  }
+                }
+                emptyGroupInserts.current.set(headerRow.groupId, sectionIdx);
+                groupActions.update(headerRow.groupId, {});
+              }
+            }
           }
         }
       }
@@ -305,14 +403,11 @@ export function GridEditor({
       document.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("pointerup", onPointerUp);
     };
-  }, [onReorderLayers, groupActions, resetDrag]);
+  }, [onReorderLayers, groupActions, resetDrag, getDraggedRowRange]);
 
   const groupMap = new Map(groups.map((g) => [g.id, g]));
 
-  // Track where empty groups should render (element index in the sections list)
-  const emptyGroupInserts = useRef<Map<string, number>>(new Map());
-
-  const renderLayerRow = (layer: Layer, index: number, elemIdx: number, inGroup: boolean) => (
+  const renderLayerRow = (layer: Layer, index: number, rowIdx: number, inGroup: boolean) => (
     <LayerRow
       key={layer.id}
       layer={layer}
@@ -322,9 +417,12 @@ export function GridEditor({
       canRemove={layers.length > 1}
       cycleBeats={cycleBeats}
       isDragging={draggingId === layer.id}
-      dropPos={dropAfterElem === elemIdx ? "below" : null}
+      dropPos={
+        indicatorSlot === rowIdx ? "above" :
+        indicatorSlot === rowIdx + 1 ? "below" : null
+      }
       inGroup={inGroup}
-      elemIdx={elemIdx}
+      rowIdx={rowIdx}
       onSetStep={(step, value) => onSetStep(layer.id, step, value)}
       onSelect={() => onSelectLayer(layer.id)}
       onUpdateLayer={(updates) => onUpdateLayer(layer.id, updates)}
@@ -335,22 +433,21 @@ export function GridEditor({
       onClear={() => onClearPattern(layer.id)}
       onUngroupLayer={inGroup ? () => groupActions.ungroupLayer(layer.id) : undefined}
       onHandlePointerDown={(e) => handleDragHandlePointerDown(
-        e, elemIdx, layer.id, layer.name, layer.color,
+        e, layer.id, layer.name, layer.color,
       )}
     />
   );
 
-  // Build group-aware render sections from flat layers array.
-  // Two-pass approach: first build the element map, then render using final indices.
+  // Build VisualRow map and render sections
   const renderSections = () => {
-    // Pass 1: Build the element map (ordered list of all visual elements)
-    const elemMap: ElemInfo[] = [];
+    const rowMap: VisualRow[] = [];
     const renderedGroupIds = new Set<string>();
-    // Also collect data needed for rendering
-    const elemData: Array<
+
+    // Collect section data for rendering
+    type SectionData =
       | { type: "layer"; layer: Layer; layerIndex: number }
-      | { type: "group"; group: LayerGroup; groupLayers: { layer: Layer; index: number }[] }
-    > = [];
+      | { type: "group"; group: LayerGroup; groupLayers: { layer: Layer; index: number }[] };
+    const sections: SectionData[] = [];
 
     let i = 0;
     while (i < layers.length) {
@@ -359,22 +456,18 @@ export function GridEditor({
         const group = groupMap.get(layer.groupId)!;
         renderedGroupIds.add(group.id);
         const groupLayers: { layer: Layer; index: number }[] = [];
-        const firstIdx = i;
         while (i < layers.length && layers[i].groupId === layer.groupId) {
           groupLayers.push({ layer: layers[i], index: i });
           i++;
         }
-        const lastIdx = i - 1;
-        elemMap.push({ type: "group", groupId: group.id, firstLayerIndex: firstIdx, lastLayerIndex: lastIdx });
-        elemData.push({ type: "group", group, groupLayers });
+        sections.push({ type: "group", group, groupLayers });
       } else {
-        elemMap.push({ type: "layer", layerIndex: i, groupId: layer.groupId || null });
-        elemData.push({ type: "layer", layer: layers[i], layerIndex: i });
+        sections.push({ type: "layer", layer: layers[i], layerIndex: i });
         i++;
       }
     }
 
-    // Insert empty groups at their stored positions (or at end)
+    // Insert empty groups at stored positions
     const emptyGroups: { group: LayerGroup; insertAt: number }[] = [];
     for (const group of groups) {
       if (renderedGroupIds.has(group.id)) {
@@ -382,69 +475,120 @@ export function GridEditor({
         continue;
       }
       const pos = emptyGroupInserts.current.get(group.id);
-      const insertAt = pos !== undefined ? Math.min(pos, elemMap.length) : elemMap.length;
+      const insertAt = pos !== undefined ? Math.min(pos, sections.length) : sections.length;
       emptyGroups.push({ group, insertAt });
     }
     emptyGroups.sort((a, b) => b.insertAt - a.insertAt);
     for (const { group, insertAt } of emptyGroups) {
-      elemMap.splice(insertAt, 0, { type: "group", groupId: group.id, firstLayerIndex: -1, lastLayerIndex: -1 });
-      elemData.splice(insertAt, 0, { type: "group", group, groupLayers: [] });
+      sections.splice(insertAt, 0, { type: "group", group, groupLayers: [] });
     }
 
-    // Update the element map ref so pointer handlers can use it
-    elemMapRef.current = elemMap;
-
-    // Pass 2: Render elements using final indices from elemMap
-    const renderGroupElement = (group: LayerGroup, groupLayers: { layer: Layer; index: number }[], eIdx: number) => (
-      <div
-        key={`group-${group.id}`}
-        className={`layer-group ${group.muted ? "group-muted" : ""} ${draggingId === group.id ? "dragging" : ""} ${dropAfterElem === eIdx ? "drop-below" : ""} ${dragOverGroupId === group.id ? "drag-target" : ""}`}
-        data-elem-idx={eIdx}
-        data-group-id={group.id}
-      >
-        <GroupHeader
-          group={group}
-          layerCount={groupLayers.length}
-          onToggleCollapse={() => groupActions.update(group.id, { collapsed: !group.collapsed })}
-          onToggleMute={() => groupActions.toggleMute(group.id)}
-          onToggleSolo={() => groupActions.toggleSolo(group.id)}
-          onUpdateGroup={(updates) => groupActions.update(group.id, updates)}
-          onClear={() => groupActions.clear(group.id)}
-          onDuplicate={() => groupActions.duplicate(group.id)}
-          onRemove={() => groupActions.remove(group.id)}
-          onHandlePointerDown={(e) => handleDragHandlePointerDown(
-            e, eIdx, group.id, `⌗ ${group.name}`, "rgba(60,60,65,0.95)",
-          )}
-        />
-        {!group.collapsed && (
-          <>
-            {groupLayers.length > 0 && groupLayers.map(({ layer: gl, index: gi }) => renderLayerRow(gl, gi, eIdx, true))}
-            <div className="group-add-layer">
-              <button className="add-layer-btn" onClick={() => groupActions.addLayer(group.id, "manual")}>+ Manual</button>
-              <button className="add-layer-btn add-random-btn" onClick={() => groupActions.addLayer(group.id, "random")}>+ Random</button>
-            </div>
-          </>
-        )}
-      </div>
-    );
-
-    return elemData.map((data, eIdx) => {
-      if (data.type === "layer") {
-        return renderLayerRow(data.layer, data.layerIndex, eIdx, false);
+    // Build the VisualRow map — every visible row gets its own index
+    for (const section of sections) {
+      if (section.type === "layer") {
+        rowMap.push({
+          kind: "layer",
+          layerId: section.layer.id,
+          layerIndex: section.layerIndex,
+          groupId: null,
+        });
       } else {
-        return renderGroupElement(data.group, data.groupLayers, eIdx);
+        const { group, groupLayers } = section;
+        rowMap.push({
+          kind: "group-header",
+          groupId: group.id,
+          firstLayerIndex: groupLayers.length > 0 ? groupLayers[0].index : -1,
+          layerCount: groupLayers.length,
+        });
+        if (!group.collapsed) {
+          for (const { layer: gl, index: gi } of groupLayers) {
+            rowMap.push({
+              kind: "layer",
+              layerId: gl.id,
+              layerIndex: gi,
+              groupId: group.id,
+            });
+          }
+        }
       }
-    });
+    }
+
+    rowMapRef.current = rowMap;
+
+    // Render: assign sequential row indices
+    let rowIdx = 0;
+    const elements: React.JSX.Element[] = [];
+
+    for (const section of sections) {
+      if (section.type === "layer") {
+        elements.push(renderLayerRow(section.layer, section.layerIndex, rowIdx, false));
+        rowIdx++;
+      } else {
+        const { group, groupLayers } = section;
+        const headerRowIdx = rowIdx;
+        rowIdx++;
+
+        const layerElements: React.JSX.Element[] = [];
+        if (!group.collapsed) {
+          for (const { layer: gl, index: gi } of groupLayers) {
+            layerElements.push(renderLayerRow(gl, gi, rowIdx, true));
+            rowIdx++;
+          }
+        }
+
+        // Determine drop-below indicator on group container
+        // The group container shows drop-below if the indicator slot is right after
+        // the last row in this group (header + layers)
+        const groupLastRowIdx = headerRowIdx + (group.collapsed ? 0 : groupLayers.length);
+        const showGroupDropBelow = indicatorSlot === groupLastRowIdx + 1;
+        const showGroupDropAbove = indicatorSlot === headerRowIdx;
+
+        elements.push(
+          <div
+            key={`group-${group.id}`}
+            className={`layer-group ${group.muted ? "group-muted" : ""} ${draggingId === group.id ? "dragging" : ""} ${showGroupDropBelow ? "drop-below" : ""} ${showGroupDropAbove ? "drop-above" : ""} ${dragOverGroupId === group.id ? "drag-target" : ""}`}
+            data-row-idx={headerRowIdx}
+            data-group-id={group.id}
+          >
+            <GroupHeader
+              group={group}
+              layerCount={groupLayers.length}
+              onToggleCollapse={() => groupActions.update(group.id, { collapsed: !group.collapsed })}
+              onToggleMute={() => groupActions.toggleMute(group.id)}
+              onToggleSolo={() => groupActions.toggleSolo(group.id)}
+              onUpdateGroup={(updates) => groupActions.update(group.id, updates)}
+              onClear={() => groupActions.clear(group.id)}
+              onDuplicate={() => groupActions.duplicate(group.id)}
+              onRemove={() => groupActions.remove(group.id)}
+              onHandlePointerDown={(e) => handleDragHandlePointerDown(
+                e, group.id, `⌗ ${group.name}`, "rgba(60,60,65,0.95)",
+              )}
+            />
+            {!group.collapsed && (
+              <>
+                {layerElements}
+                <div className="group-add-layer">
+                  <button className="add-layer-btn" onClick={() => groupActions.addLayer(group.id, "manual")}>+ Manual</button>
+                  <button className="add-layer-btn add-random-btn" onClick={() => groupActions.addLayer(group.id, "random")}>+ Random</button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+    }
+
+    return elements;
   };
 
   return (
     <div className="grid-editor">
       {draggingId && (
-        <div className={`top-drop-zone ${dropAfterElem === -1 ? "active" : ""}`} />
+        <div className={`top-drop-zone ${indicatorSlot === 0 ? "active" : ""}`} />
       )}
       {renderSections()}
       {draggingId && (
-        <div className={`bottom-drop-zone ${dropAfterElem === -2 ? "active" : ""}`} />
+        <div className={`bottom-drop-zone ${indicatorSlot === rowMapRef.current.length ? "active" : ""}`} />
       )}
       <div className="add-layer-controls">
         <button className="add-layer-btn" onClick={() => onAddLayer("manual")}>
@@ -475,7 +619,7 @@ interface LayerRowProps {
   isDragging: boolean;
   dropPos: "above" | "below" | null;
   inGroup: boolean;
-  elemIdx: number;
+  rowIdx: number;
   onSetStep: (step: number, value: 0 | 1) => void;
   onSelect: () => void;
   onUpdateLayer: (updates: Partial<Layer>) => void;
@@ -498,7 +642,7 @@ function LayerRow({
   isDragging,
   dropPos,
   inGroup,
-  elemIdx,
+  rowIdx,
   onSetStep,
   onSelect,
   onUpdateLayer,
@@ -724,8 +868,8 @@ function LayerRow({
 
   return (
     <div
-      className={`layer-row ${isSelected ? "selected" : ""} ${layer.muted ? "muted" : ""} ${isRandom ? "random" : ""} ${isDragging ? "dragging" : ""} ${dropPos === "below" ? "drop-below" : ""}`}
-      data-elem-idx={inGroup ? undefined : elemIdx}
+      className={`layer-row ${isSelected ? "selected" : ""} ${layer.muted ? "muted" : ""} ${isRandom ? "random" : ""} ${isDragging ? "dragging" : ""} ${dropPos === "below" ? "drop-below" : ""} ${dropPos === "above" ? "drop-above" : ""}`}
+      data-row-idx={rowIdx}
       data-layer-index={index}
       onClick={onSelect}
     >
