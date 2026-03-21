@@ -945,8 +945,8 @@ body {
   transform: scale(0.98);
 }
 
-/* Drop position indicator — line above or below the target element.
-   Each row can show at most one indicator (above OR below, never both). */
+/* Drop position indicator — single line below the target element.
+   Only ONE element per slot shows the indicator; never double lines. */
 .layer-row.drop-below::after,
 .layer-group.drop-below::after {
   content: "";
@@ -963,8 +963,8 @@ body {
   animation: drop-line-pulse 0.8s ease-in-out infinite;
 }
 
-.layer-row.drop-above::before,
-.layer-group.drop-above::before {
+/* drop-above: only used for first layer inside a group (slot between header and first layer) */
+.layer-row.drop-above::before {
   content: "";
   position: absolute;
   left: 0;
@@ -986,7 +986,7 @@ body {
 
 /* Top drop zone — appears during drag for "move to top" */
 .top-drop-zone {
-  height: 8px;
+  height: 24px;
   border-radius: 4px;
   transition: all 0.2s;
   position: relative;
