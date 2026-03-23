@@ -20,51 +20,86 @@ type StepCallback = (layerId: string, step: number) => void;
 
 /**
  * Humanize velocity at playback time.
- * Applies metric accent hierarchy + random micro-jitter.
+ * Applies a pre-computed accent weight + random micro-jitter.
  * Never modifies stored pattern data — purely a rendering-time effect.
- *
- * @param baseVelocity  Raw velocity (0–1 scale, already incorporating layer volume)
- * @param step          Current step index within the layer
- * @param totalSteps    Total steps in the layer
- * @param cycleBeats    Number of beats in the cycle
- * @returns             Humanized velocity (0–1 scale)
  */
-function humanizeVelocity(
-  baseVelocity: number,
-  step: number,
-  totalSteps: number,
-  cycleBeats: number,
-): number {
-  const stepsPerBeat = totalSteps / cycleBeats;
-
-  // ── Metric accent hierarchy ──
-  // Where does this step fall within the beat?
-  // beat position 0 = downbeat, 0.5 = "and", 0.25/"0.75" = "e"/"a"
-  const posInBeat = (step % stepsPerBeat) / stepsPerBeat;
-
-  let accentScale: number;
-  if (posInBeat === 0) {
-    // Downbeat — full weight, slight boost for beat 1
-    accentScale = step === 0 ? 1.0 : 0.97;
-  } else if (Math.abs(posInBeat - 0.5) < 0.001) {
-    // "and" — slightly softer
-    accentScale = 0.92;
-  } else if (stepsPerBeat >= 4 && (
-    Math.abs(posInBeat - 0.25) < 0.001 ||
-    Math.abs(posInBeat - 0.75) < 0.001
-  )) {
-    // "e" / "a" (16th note subdivisions) — ghost-note territory
-    accentScale = 0.84;
-  } else {
-    // Other subdivisions — gentle reduction proportional to depth
-    accentScale = 0.88;
-  }
-
-  // ── Random micro-jitter ──
+function humanizeVelocity(baseVelocity: number, accentWeight: number): number {
   // ±6% random variation — breaks machine-gun effect
   const jitter = 1.0 + (Math.random() - 0.5) * 0.12;
+  return Math.min(1.0, Math.max(0, baseVelocity * accentWeight * jitter));
+}
 
-  return Math.min(1.0, Math.max(0, baseVelocity * accentScale * jitter));
+/**
+ * Compute per-onset accent weights from the pattern's inter-onset intervals.
+ *
+ * Instead of a fixed metric hierarchy (downbeat > offbeat), this derives
+ * accents from the rhythm's own structure: a note after a longer gap gets
+ * slightly more weight. This naturally produces correct accents for:
+ * - Swing grooves (offbeats after long gaps get emphasis)
+ * - Polyrhythmic groupings (first note of each group gets emphasis)
+ * - Evenly spaced patterns (uniform — no bias)
+ *
+ * Uses time-domain gaps (accounting for swing) so swing feel is reflected
+ * in the accent contour, not just in timing.
+ *
+ * @returns Array of accent weights (0–1) per step. 0 for rests.
+ */
+function computeAccentWeights(
+  pattern: (0 | 1)[],
+  steps: number,
+  swing: number,
+): number[] {
+  const stepDur = 1 / steps; // fractional duration per step within cycle
+
+  // Collect onset positions in time-space (0–1 fraction of cycle)
+  const onsets: { step: number; time: number }[] = [];
+  for (let i = 0; i < steps; i++) {
+    if (pattern[i] !== 1) continue;
+    let time: number;
+    if (swing !== 0.5 && i % 2 === 1) {
+      const pairStart = Math.floor(i / 2) * 2 * stepDur;
+      time = pairStart + swing * 2 * stepDur;
+    } else {
+      time = i * stepDur;
+    }
+    onsets.push({ step: i, time });
+  }
+
+  const weights = new Array<number>(steps).fill(0);
+
+  if (onsets.length <= 1) {
+    for (const o of onsets) weights[o.step] = 1.0;
+    return weights;
+  }
+
+  // Compute time-domain IOI (gap) before each onset, wrapping around cycle
+  const iois: number[] = [];
+  for (let i = 0; i < onsets.length; i++) {
+    const prev = i === 0 ? onsets[onsets.length - 1] : onsets[i - 1];
+    let gap = onsets[i].time - prev.time;
+    if (gap <= 0) gap += 1.0;
+    iois.push(gap);
+  }
+
+  const maxIOI = Math.max(...iois);
+  const minIOI = Math.min(...iois);
+
+  if (maxIOI - minIOI < 1e-6) {
+    // Uniform spacing — all accents equal
+    for (const o of onsets) weights[o.step] = 1.0;
+    return weights;
+  }
+
+  // Map: longer preceding gap → stronger accent
+  // Range: 0.88 (after shortest gap) to 1.0 (after longest gap)
+  const BASE = 0.88;
+  const RANGE = 1.0 - BASE;
+  for (let i = 0; i < onsets.length; i++) {
+    const normalized = (iois[i] - minIOI) / (maxIOI - minIOI);
+    weights[onsets[i].step] = BASE + normalized * RANGE;
+  }
+
+  return weights;
 }
 
 export class AudioEngine {
@@ -327,6 +362,8 @@ export class AudioEngine {
     // With gap: super-cycle = (1 + gap) cycles, only play in the first
     const superCycleTicks = cycleTicks * (1 + gap);
 
+    const accentWeights = computeAccentWeights(layer.pattern, layer.steps, layer.swing);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events: Array<Record<string, any>> = [];
 
@@ -344,19 +381,18 @@ export class AudioEngine {
         time: `${tickPos}i`,
         step: i,
         velocity: layer.velocities[i],
+        accent: accentWeights[i],
       });
     }
 
     const layerVolume = layer.volume;
     const layerId = layer.id;
 
-    const cycleBeats = cycleTicks / APP_PPQ;
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const part = new Tone.Part((time: number, event: any) => {
       if (layerVolume > 0) {
         const rawVol = (event.velocity / 127) * layerVolume;
-        const vol = humanizeVelocity(rawVol, event.step, layer.steps, cycleBeats);
+        const vol = humanizeVelocity(rawVol, event.accent);
         this.triggerSynth(synth, spec, time, vol);
       }
       Tone.getDraw().schedule(() => {
@@ -414,9 +450,8 @@ export class AudioEngine {
         // pattern[step] === 0 means "forbidden" — never fires
         if (allowedMask[currentStep] === 1 && Math.random() < density) {
           if (layerVolume > 0) {
-            const cycleBeats = cycleTicks / APP_PPQ;
             const rawVol = (100 / 127) * layerVolume;
-            const vol = humanizeVelocity(rawVol, currentStep, steps, cycleBeats);
+            const vol = humanizeVelocity(rawVol, 1.0);
             this.triggerSynth(synth, spec, triggerTime, vol);
           }
           Tone.getDraw().schedule(() => {
