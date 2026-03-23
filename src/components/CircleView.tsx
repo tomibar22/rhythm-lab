@@ -70,7 +70,13 @@ export function CircleView({
       // Draw steps
       const isRandom = layer.type === "random";
       for (let i = 0; i < layer.steps; i++) {
-        const angle = (i / layer.steps) * Math.PI * 2 - Math.PI / 2;
+        // Apply swing to angular position of odd steps (mirrors audio engine)
+        let timeFrac = i / layer.steps;
+        if (layer.swing !== 0.5 && i % 2 === 1) {
+          const pairStart = Math.floor(i / 2) * 2 / layer.steps;
+          timeFrac = pairStart + layer.swing * 2 / layer.steps;
+        }
+        const angle = timeFrac * Math.PI * 2 - Math.PI / 2;
         const x = cx + Math.cos(angle) * radius;
         const y = cy + Math.sin(angle) * radius;
 
@@ -128,6 +134,37 @@ export function CircleView({
         }
       }
 
+      // Helper: compute swung angle for a step index (fractional OK for midpoints)
+      const stepAngle = (step: number): number => {
+        let frac = step / layer.steps;
+        // Apply swing to odd steps; for fractional midpoints use linear interpolation
+        if (layer.swing !== 0.5) {
+          const floorStep = Math.floor(step);
+          const ceilStep = Math.ceil(step);
+          const t = step - floorStep;
+          const fracFloor = (() => {
+            let f = floorStep / layer.steps;
+            if (floorStep % 2 === 1) {
+              const ps = Math.floor(floorStep / 2) * 2 / layer.steps;
+              f = ps + layer.swing * 2 / layer.steps;
+            }
+            return f;
+          })();
+          const fracCeil = (() => {
+            const cs = ceilStep % layer.steps;
+            let f = cs / layer.steps;
+            if (cs % 2 === 1) {
+              const ps = Math.floor(cs / 2) * 2 / layer.steps;
+              f = ps + layer.swing * 2 / layer.steps;
+            }
+            if (ceilStep >= layer.steps) f += 1; // wrapped
+            return f;
+          })();
+          frac = fracFloor + t * (fracCeil - fracFloor);
+        }
+        return frac * Math.PI * 2 - Math.PI / 2;
+      };
+
       // Draw IOI annotations (skip for random layers)
       if (!isRandom && visibleLayers.length <= 4) {
         const iois = getIOIs(layer.pattern);
@@ -148,8 +185,7 @@ export function CircleView({
             endStep > startStep
               ? (startStep + endStep) / 2
               : (startStep + (endStep + layer.steps)) / 2;
-          const midAngle =
-            (midStep / layer.steps) * Math.PI * 2 - Math.PI / 2;
+          const midAngle = stepAngle(midStep);
           const labelRadius = radius + dotRadius * 2.5;
           const lx = cx + Math.cos(midAngle) * labelRadius;
           const ly = cy + Math.sin(midAngle) * labelRadius;
