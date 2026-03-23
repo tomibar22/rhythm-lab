@@ -1134,6 +1134,19 @@ body {
   transform: scale(1.3);
 }
 
+.gap-compact-play.clickable,
+.gap-compact-rest.clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.gap-compact-play.clickable:hover,
+.gap-compact-rest.clickable:hover {
+  background: var(--bg-hover);
+}
+
 .gap-compact-play,
 .gap-compact-rest {
   display: flex;

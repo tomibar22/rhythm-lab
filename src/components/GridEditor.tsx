@@ -1575,18 +1575,22 @@ function GapControl({
       <div className="gap-dots">
         {showCompact ? (
           <>
-            {playCount > 1 ? (
-              <span className="gap-compact-play">
-                <span className="gap-dot play" />
-                <span className="gap-play-count">×{playCount}</span>
-              </span>
-            ) : (
+            <span
+              className="gap-compact-play clickable"
+              onClick={() => { if (gap > 0) onChange(playCount + 1, gap - 1); }}
+              title="Click to add a play cycle"
+            >
               <span className="gap-dot play" />
-            )}
+              {playCount > 1 && <span className="gap-play-count">×{playCount}</span>}
+            </span>
             {gap > 0 && (
-              <span className="gap-compact-rest">
+              <span
+                className="gap-compact-rest clickable"
+                onClick={() => { if (playCount > 1) onChange(playCount - 1, gap + 1); }}
+                title="Click to add a rest cycle"
+              >
                 <span className="gap-dot rest" />
-                <span className="gap-rest-count">×{gap}</span>
+                {gap > 1 && <span className="gap-rest-count">×{gap}</span>}
               </span>
             )}
           </>
