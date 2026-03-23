@@ -861,17 +861,21 @@ function LayerRow({
   );
 
   // ── Swing control handlers ──
+  // Display: 0–100% (0=straight, 100=triplet feel)
+  // Internal: 0.5–0.67 (swing ratio for odd-indexed steps)
+  const swingToDisplay = (internal: number) => Math.round(((internal - 0.5) / 0.17) * 100);
+  const displayToSwing = (display: number) => 0.5 + (display / 100) * 0.17;
 
   useEffect(() => {
-    setSwingText(String(Math.round(layer.swing * 100)));
+    setSwingText(String(swingToDisplay(layer.swing)));
   }, [layer.swing]);
 
   const commitSwing = () => {
     const val = parseInt(swingText);
-    if (!isNaN(val) && val >= 50 && val <= 67) {
-      onUpdateLayer({ swing: val / 100 });
+    if (!isNaN(val) && val >= 0 && val <= 100) {
+      onUpdateLayer({ swing: displayToSwing(val) });
     } else {
-      setSwingText(String(Math.round(layer.swing * 100)));
+      setSwingText(String(swingToDisplay(layer.swing)));
     }
   };
 
@@ -883,15 +887,16 @@ function LayerRow({
       e.preventDefault();
       e.stopPropagation();
       swingDragStartY.current = e.clientY;
-      swingDragStart.current = Math.round(layer.swing * 100);
+      swingDragStart.current = swingToDisplay(layer.swing);
       isDraggingSwing.current = false;
 
       const onMove = (me: PointerEvent) => {
         const dy = swingDragStartY.current - me.clientY;
-        const steps = Math.trunc(dy / 5);
+        const steps = Math.trunc(dy / 3);
         if (steps !== 0) isDraggingSwing.current = true;
-        const raw = Math.min(67, Math.max(50, swingDragStart.current + steps));
-        onUpdateLayer({ swing: raw / 100 });
+        const base = Math.round(swingDragStart.current / 5) * 5;
+        const raw = Math.min(100, Math.max(0, base + steps * 5));
+        onUpdateLayer({ swing: displayToSwing(raw) });
       };
 
       const onUp = () => {
@@ -923,9 +928,9 @@ function LayerRow({
       if (Math.abs(swingWheelAcc.current) >= threshold) {
         const steps = Math.trunc(swingWheelAcc.current / threshold);
         swingWheelAcc.current -= steps * threshold;
-        const cur = Math.round(layer.swing * 100);
-        const raw = Math.min(67, Math.max(50, cur - steps));
-        onUpdateLayer({ swing: raw / 100 });
+        const cur = swingToDisplay(layer.swing);
+        const raw = Math.min(100, Math.max(0, cur - steps * 5));
+        onUpdateLayer({ swing: displayToSwing(raw) });
       }
     },
     [layer.swing, onUpdateLayer],
@@ -1185,7 +1190,7 @@ function LayerRow({
             onPointerDown={handleSwingPointerDown}
             onDoubleClick={handleSwingDoubleClick}
             onWheel={handleSwingWheel}
-            title="Swing feel (50=straight, 67=triplet). Drag or double-click to type"
+            title="Swing amount (0=straight, 100=triplet feel). Drag or double-click to type"
           >
             <span className="swing-label">swing</span>
             <input
