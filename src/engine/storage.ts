@@ -6,6 +6,8 @@
 import { Layer, LayerType, SoundPreset } from "./types";
 import { BUILT_IN_TEMPLATES, isBuiltIn } from "./defaultTemplates";
 
+const ORDER_KEY = "rhythm-lab:template-order";
+
 // ─────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────
@@ -112,9 +114,29 @@ function getUserTemplates(): SavedTemplate[] {
   }
 }
 
-/** Get all templates: built-in first, then user-saved */
+/** Get saved custom order (array of template IDs), or null if none */
+function getTemplateOrder(): string[] | null {
+  try {
+    const raw = localStorage.getItem(ORDER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Get all templates: respects custom order if set, else built-in first then user */
 export function getSavedTemplates(): SavedTemplate[] {
-  return [...BUILT_IN_TEMPLATES, ...getUserTemplates()];
+  const all = [...BUILT_IN_TEMPLATES, ...getUserTemplates()];
+  const order = getTemplateOrder();
+  if (!order) return all;
+
+  // Sort by custom order; any templates not in the order list go at the end
+  const idxMap = new Map(order.map((id, i) => [id, i]));
+  return all.sort((a, b) => {
+    const ai = idxMap.get(a.id) ?? order.length;
+    const bi = idxMap.get(b.id) ?? order.length;
+    return ai - bi;
+  });
 }
 
 export function saveTemplate(
@@ -170,6 +192,14 @@ export function saveTemplate(
   };
   userTemplates.push(template);
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(userTemplates));
+
+  // Append to custom order if one exists
+  const order = getTemplateOrder();
+  if (order) {
+    order.push(template.id);
+    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+  }
+
   return template;
 }
 
@@ -187,19 +217,22 @@ export function deleteTemplate(id: string): void {
   if (isBuiltIn(id)) return; // Cannot delete built-in templates
   const templates = getUserTemplates().filter((t) => t.id !== id);
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  // Remove from custom order if present
+  const order = getTemplateOrder();
+  if (order) {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(order.filter((oid) => oid !== id)));
+  }
 }
 
 export function reorderTemplates(fromIndex: number, toIndex: number): void {
-  const templates = getUserTemplates();
-  // Adjust indices to account for built-in templates at the beginning
-  const builtInCount = BUILT_IN_TEMPLATES.length;
-  const adjFrom = fromIndex - builtInCount;
-  const adjTo = toIndex - builtInCount;
-  if (adjFrom < 0 || adjTo < 0 || adjFrom === adjTo) return;
-  if (adjFrom >= templates.length || adjTo >= templates.length) return;
-  const [moved] = templates.splice(adjFrom, 1);
-  templates.splice(adjTo, 0, moved);
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  if (fromIndex === toIndex) return;
+  // Work on the full ordered list (built-in + user)
+  const all = getSavedTemplates();
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= all.length || toIndex >= all.length) return;
+  const ids = all.map((t) => t.id);
+  const [moved] = ids.splice(fromIndex, 1);
+  ids.splice(toIndex, 0, moved);
+  localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
 }
 
 /** Re-export for use in UI to show/hide delete/rename buttons */

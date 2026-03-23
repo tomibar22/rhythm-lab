@@ -77,8 +77,8 @@ export function isBuiltIn(templateId: string): boolean {
 }
 
 /**
- * Call this from the browser console to export your current localStorage
- * templates as code you can paste into BUILT_IN_TEMPLATES above.
+ * Call this from the browser console to export ALL templates (built-in + user)
+ * in their current display order as code for BUILT_IN_TEMPLATES.
  *
  * Usage (in browser console):
  *   copy(exportTemplatesForBundling())
@@ -86,19 +86,34 @@ export function isBuiltIn(templateId: string): boolean {
  * Then paste into the BUILT_IN_TEMPLATES array in this file.
  */
 export function exportTemplatesForBundling(): string {
-  const raw = localStorage.getItem("rhythm-lab:templates");
-  if (!raw) return "// No templates found in localStorage";
   try {
-    const templates = JSON.parse(raw) as SavedTemplate[];
+    const userRaw = localStorage.getItem("rhythm-lab:templates");
+    const userTemplates: SavedTemplate[] = userRaw ? JSON.parse(userRaw) : [];
+    const all = [...BUILT_IN_TEMPLATES, ...userTemplates];
+
+    // Apply custom order if set
+    const orderRaw = localStorage.getItem("rhythm-lab:template-order");
+    let ordered = all;
+    if (orderRaw) {
+      const order: string[] = JSON.parse(orderRaw);
+      const idxMap = new Map(order.map((id, i) => [id, i]));
+      ordered = [...all].sort((a, b) => {
+        const ai = idxMap.get(a.id) ?? order.length;
+        const bi = idxMap.get(b.id) ?? order.length;
+        return ai - bi;
+      });
+    }
+
+    if (ordered.length === 0) return "// No templates found";
     // Remap IDs to builtin: prefix, reset timestamps
-    const exported = templates.map((t) => ({
+    const exported = ordered.map((t) => ({
       ...t,
       id: `builtin:${t.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       savedAt: 0,
     }));
     return JSON.stringify(exported, null, 2);
   } catch {
-    return "// Error parsing templates from localStorage";
+    return "// Error exporting templates";
   }
 }
 
