@@ -225,6 +225,29 @@ export class AudioEngine {
   }
 
   /**
+   * Compute the correct startTick and initialCounter for a random layer
+   * so it stays in sync with the cycle position mid-playback.
+   */
+  private computeRandomLayerSync(
+    layer: Layer,
+    cycleTicks: number,
+    alignTick: number,
+  ): { startTick: number; initialCounter: number } {
+    const transport = Tone.getTransport();
+    const roundedStepTicks = Math.round(cycleTicks / layer.steps);
+    const totalStepsPerSuper = layer.steps * (1 + layer.gap);
+
+    const offsetTicks = transport.ticks - alignTick;
+    // How many step intervals have elapsed since alignTick?
+    // Use ceil to find the next step boundary at or after current position.
+    const stepsElapsed = Math.ceil(offsetTicks / roundedStepTicks);
+    const startTick = alignTick + stepsElapsed * roundedStepTicks;
+    const initialCounter = stepsElapsed % totalStepsPerSuper;
+
+    return { startTick, initialCounter };
+  }
+
+  /**
    * Schedule all layers (full reschedule). Clears everything first.
    * Used for: play start, cycle-length changes, mute/solo changes.
    *
@@ -245,13 +268,23 @@ export class AudioEngine {
 
     const cycleTicks = cycleBeats * APP_PPQ;
     const hasSolo = layers.some((l) => l.solo);
+    const transport = Tone.getTransport();
+    const isMidPlayback = transport.state === "started" && transport.ticks > alignTick;
 
     for (const layer of layers) {
       if (layer.muted) continue;
       if (hasSolo && !layer.solo) continue;
 
       if (layer.type === "random") {
-        this.scheduleRandomLayer(layer, cycleTicks, onStep, alignTick);
+        if (isMidPlayback) {
+          // Mid-playback: compute correct counter so random layers stay
+          // in sync with the cycle position instead of resetting to step 0.
+          const { startTick, initialCounter } =
+            this.computeRandomLayerSync(layer, cycleTicks, alignTick);
+          this.scheduleRandomLayer(layer, cycleTicks, onStep, startTick, initialCounter);
+        } else {
+          this.scheduleRandomLayer(layer, cycleTicks, onStep, alignTick);
+        }
       } else {
         this.scheduleManualLayer(layer, cycleTicks, onStep, alignTick);
       }
@@ -270,27 +303,10 @@ export class AudioEngine {
     this.clearLayerParts(layer.id);
 
     const cycleTicks = cycleBeats * APP_PPQ;
-    const transport = Tone.getTransport();
 
     if (layer.type === "random") {
-      // Compute where we are in the cycle so the counter can resume in sync.
-      // Find the next step boundary from current transport position,
-      // and derive which step that corresponds to.
-      const stepTicks = cycleTicks / layer.steps;
-      const offsetTicks = transport.ticks - this.cycleAlignTick;
-      const cyclePos = ((offsetTicks % cycleTicks) + cycleTicks) % cycleTicks;
-      const currentStep = Math.floor(cyclePos / stepTicks);
-      // Start the loop at the next step boundary so it fires on the grid
-      const nextStepTick = this.cycleAlignTick + currentStep * Math.round(stepTicks);
-      // Find the actual next boundary at or after transport.ticks
-      let startTick = nextStepTick;
-      while (startTick < transport.ticks) {
-        startTick += Math.round(stepTicks);
-      }
-      const stepsFromCycleStart = Math.round((startTick - this.cycleAlignTick) / stepTicks);
-      const totalStepsPerSuper = layer.steps * (1 + layer.gap);
-      const initialCounter = stepsFromCycleStart % totalStepsPerSuper;
-
+      const { startTick, initialCounter } =
+        this.computeRandomLayerSync(layer, cycleTicks, this.cycleAlignTick);
       this.scheduleRandomLayer(layer, cycleTicks, onStep, startTick, initialCounter);
     } else {
       this.scheduleManualLayer(layer, cycleTicks, onStep, 0);
