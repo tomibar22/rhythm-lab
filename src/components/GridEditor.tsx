@@ -1539,9 +1539,11 @@ function GapControl({
     : `Plays ${playCount} cycle${playCount > 1 ? "s" : ""}, rests ${gap} cycle${gap > 1 ? "s" : ""}`;
   const showCompact = total > 6;
 
-  // Click dot at index i → set playCount = i + 1, gap = total - (i + 1)
+  // Click a rest dot → make it (and everything before) play
+  // Click a play dot → make it (and everything after) rest (min 1 play)
   const handleDotClick = (i: number) => {
-    const newPlay = i + 1;
+    const isPlay = i < playCount;
+    const newPlay = isPlay ? Math.max(1, i) : i + 1;
     const newGap = total - newPlay;
     if (newPlay >= 1 && newGap >= 0) {
       onChange(newPlay, newGap);

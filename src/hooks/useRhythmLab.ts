@@ -832,6 +832,7 @@ export function useRhythmLab() {
         sound: tl.sound,
         volume: tl.volume,
         density: tl.density,
+        playCount: tl.playCount ?? 1,
         gap: tl.gap,
         swing: tl.swing,
         groupId: tl.groupId,
