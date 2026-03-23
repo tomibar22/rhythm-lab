@@ -766,6 +766,14 @@ function LayerRow({
   const volumeWheelAcc = useRef(0);
   const isDraggingVolume = useRef(false);
 
+  const [swingText, setSwingText] = useState(String(Math.round(layer.swing * 100)));
+  const [swingEditing, setSwingEditing] = useState(false);
+  const swingInputRef = useRef<HTMLInputElement>(null);
+  const swingDragStartY = useRef(0);
+  const swingDragStart = useRef(0);
+  const swingWheelAcc = useRef(0);
+  const isDraggingSwing = useRef(false);
+
   const isRandom = layer.type === "random";
 
   useEffect(() => {
@@ -850,6 +858,77 @@ function LayerRow({
       }
     },
     [layer.density, onUpdateLayer],
+  );
+
+  // ── Swing control handlers ──
+
+  useEffect(() => {
+    setSwingText(String(Math.round(layer.swing * 100)));
+  }, [layer.swing]);
+
+  const commitSwing = () => {
+    const val = parseInt(swingText);
+    if (!isNaN(val) && val >= 50 && val <= 67) {
+      onUpdateLayer({ swing: val / 100 });
+    } else {
+      setSwingText(String(Math.round(layer.swing * 100)));
+    }
+  };
+
+  const handleSwingPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      if (swingEditing) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      swingDragStartY.current = e.clientY;
+      swingDragStart.current = Math.round(layer.swing * 100);
+      isDraggingSwing.current = false;
+
+      const onMove = (me: PointerEvent) => {
+        const dy = swingDragStartY.current - me.clientY;
+        const steps = Math.trunc(dy / 5);
+        if (steps !== 0) isDraggingSwing.current = true;
+        const raw = Math.min(67, Math.max(50, swingDragStart.current + steps));
+        onUpdateLayer({ swing: raw / 100 });
+      };
+
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    },
+    [layer.swing, swingEditing, onUpdateLayer],
+  );
+
+  const handleSwingDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSwingEditing(true);
+    requestAnimationFrame(() => {
+      swingInputRef.current?.focus();
+      swingInputRef.current?.select();
+    });
+  }, []);
+
+  const handleSwingWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      swingWheelAcc.current += e.deltaY;
+      const threshold = 50;
+      if (Math.abs(swingWheelAcc.current) >= threshold) {
+        const steps = Math.trunc(swingWheelAcc.current / threshold);
+        swingWheelAcc.current -= steps * threshold;
+        const cur = Math.round(layer.swing * 100);
+        const raw = Math.min(67, Math.max(50, cur - steps));
+        onUpdateLayer({ swing: raw / 100 });
+      }
+    },
+    [layer.swing, onUpdateLayer],
   );
 
   // ── Volume control handlers ──
@@ -1097,6 +1176,34 @@ function LayerRow({
               onClick={(e) => e.stopPropagation()}
             />
             <span className="density-pct">%</span>
+          </div>
+        )}
+
+        {activeMultiplier === 2 && (
+          <div
+            className={`swing-control ${swingEditing ? "editing" : ""}`}
+            onPointerDown={handleSwingPointerDown}
+            onDoubleClick={handleSwingDoubleClick}
+            onWheel={handleSwingWheel}
+            title="Swing feel (50=straight, 67=triplet). Drag or double-click to type"
+          >
+            <span className="swing-label">swing</span>
+            <input
+              ref={swingInputRef}
+              className="swing-input"
+              type="text"
+              inputMode="numeric"
+              readOnly={!swingEditing}
+              value={swingText}
+              onChange={(e) => setSwingText(e.target.value)}
+              onBlur={() => { commitSwing(); setSwingEditing(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { commitSwing(); setSwingEditing(false); (e.target as HTMLInputElement).blur(); }
+                else if (e.key === "Escape") { setSwingText(String(Math.round(layer.swing * 100))); setSwingEditing(false); (e.target as HTMLInputElement).blur(); }
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <span className="swing-pct">%</span>
           </div>
         )}
       </div>
