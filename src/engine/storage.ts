@@ -18,6 +18,7 @@ export interface SavedPattern {
   pattern: (0 | 1)[];
   sound: SoundPreset;
   density: number;
+  playCount?: number;
   gap: number;
   swing: number;
   savedAt: number;
@@ -41,6 +42,7 @@ export interface SavedTemplateLayer {
   sound: SoundPreset;
   volume: number;
   density: number;
+  playCount?: number;
   gap: number;
   swing: number;
   groupId?: string;
@@ -81,6 +83,7 @@ export function savePattern(layer: Layer, name: string): SavedPattern {
     pattern: [...layer.pattern],
     sound: layer.sound,
     density: layer.density,
+    playCount: layer.playCount,
     gap: layer.gap,
     swing: layer.swing,
     savedAt: Date.now(),
@@ -134,6 +137,7 @@ export function saveTemplate(
       sound: l.sound,
       volume: l.volume,
       density: l.density,
+      playCount: l.playCount,
       gap: l.gap,
       swing: l.swing,
       ...(l.groupId ? { groupId: l.groupId } : {}),

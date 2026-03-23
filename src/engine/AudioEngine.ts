@@ -270,7 +270,8 @@ export class AudioEngine {
   ): { startTick: number; initialCounter: number } {
     const transport = Tone.getTransport();
     const roundedStepTicks = Math.round(cycleTicks / layer.steps);
-    const totalStepsPerSuper = layer.steps * (1 + layer.gap);
+    const playCount = layer.playCount ?? 1;
+    const totalStepsPerSuper = layer.steps * (playCount + layer.gap);
 
     const offsetTicks = transport.ticks - alignTick;
     // How many step intervals have elapsed since alignTick?
@@ -357,32 +358,37 @@ export class AudioEngine {
     const synth = this.getOrCreateSynth(layer.id, layer.sound);
     const spec = this.getSpec(layer.sound);
     const stepTicks = cycleTicks / layer.steps;
+    const playCount = layer.playCount ?? 1;
     const gap = layer.gap;
 
-    // With gap: super-cycle = (1 + gap) cycles, only play in the first
-    const superCycleTicks = cycleTicks * (1 + gap);
+    // Super-cycle = playCount + gap cycles
+    const superCycleTicks = cycleTicks * (playCount + gap);
 
     const accentWeights = computeAccentWeights(layer.pattern, layer.steps, layer.swing);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events: Array<Record<string, any>> = [];
 
-    for (let i = 0; i < layer.steps; i++) {
-      if (layer.pattern[i] !== 1) continue;
+    // Duplicate events for each play cycle within the super-cycle
+    for (let p = 0; p < playCount; p++) {
+      const cycleOffset = p * cycleTicks;
+      for (let i = 0; i < layer.steps; i++) {
+        if (layer.pattern[i] !== 1) continue;
 
-      let tickPos = Math.round(i * stepTicks);
+        let tickPos = Math.round(i * stepTicks);
 
-      if (layer.swing !== 0.5 && i % 2 === 1) {
-        const pairStart = Math.floor(i / 2) * 2 * stepTicks;
-        tickPos = Math.round(pairStart + layer.swing * 2 * stepTicks);
+        if (layer.swing !== 0.5 && i % 2 === 1) {
+          const pairStart = Math.floor(i / 2) * 2 * stepTicks;
+          tickPos = Math.round(pairStart + layer.swing * 2 * stepTicks);
+        }
+
+        events.push({
+          time: `${cycleOffset + tickPos}i`,
+          step: i,
+          velocity: layer.velocities[i],
+          accent: accentWeights[i],
+        });
       }
-
-      events.push({
-        time: `${tickPos}i`,
-        step: i,
-        velocity: layer.velocities[i],
-        accent: accentWeights[i],
-      });
     }
 
     const layerVolume = layer.volume;
@@ -423,9 +429,10 @@ export class AudioEngine {
     const density = layer.density;
     const swing = layer.swing;
     const steps = layer.steps;
+    const playCount = layer.playCount ?? 1;
     const gap = layer.gap;
     const allowedMask = [...layer.pattern]; // 1 = allowed, 0 = forbidden
-    const totalStepsPerSuper = steps * (1 + gap);
+    const totalStepsPerSuper = steps * (playCount + gap);
     const roundedStepTicks = Math.round(stepTicks);
 
     // Counter-based step tracking: increments exactly once per loop callback.
@@ -436,7 +443,7 @@ export class AudioEngine {
     const loop = new Tone.Loop((time: number) => {
       const superStep = stepCounter % totalStepsPerSuper;
       const currentStep = superStep % steps;
-      const isInPlayCycle = superStep < steps;
+      const isInPlayCycle = superStep < steps * playCount;
       stepCounter++;
 
       if (isInPlayCycle) {

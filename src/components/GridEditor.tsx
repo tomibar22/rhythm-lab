@@ -1055,7 +1055,11 @@ function LayerRow({
         </div>
 
         <div className="layer-controls">
-          <GapControl gap={layer.gap} onChange={(gap) => onUpdateLayer({ gap })} />
+          <GapControl
+            playCount={layer.playCount}
+            gap={layer.gap}
+            onChange={(playCount, gap) => onUpdateLayer({ playCount, gap })}
+          />
           <button
             className={`ctrl-btn mute-btn ${layer.muted ? "active" : ""}`}
             onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
@@ -1521,17 +1525,39 @@ function GroupHeader({
 // ─────────────────────────────────────────────
 
 function GapControl({
+  playCount,
   gap,
   onChange,
 }: {
+  playCount: number;
   gap: number;
-  onChange: (gap: number) => void;
+  onChange: (playCount: number, gap: number) => void;
 }) {
-  const total = 1 + gap;
+  const total = playCount + gap;
   const tooltip = gap === 0
     ? "Plays every cycle (click + to add rest cycles)"
-    : `Plays 1 cycle, rests ${gap} cycle${gap > 1 ? "s" : ""}`;
+    : `Plays ${playCount} cycle${playCount > 1 ? "s" : ""}, rests ${gap} cycle${gap > 1 ? "s" : ""}`;
   const showCompact = total > 6;
+
+  // Click dot at index i → set playCount = i + 1, gap = total - (i + 1)
+  const handleDotClick = (i: number) => {
+    const newPlay = i + 1;
+    const newGap = total - newPlay;
+    if (newPlay >= 1 && newGap >= 0) {
+      onChange(newPlay, newGap);
+    }
+  };
+
+  // − removes the last dot (rest first, then play, but keep ≥ 1 play)
+  const handleMinus = () => {
+    if (gap > 0) onChange(playCount, gap - 1);
+    else if (playCount > 1) onChange(playCount - 1, 0);
+  };
+
+  // + adds a rest dot
+  const handlePlus = () => {
+    if (total < 16) onChange(playCount, gap + 1);
+  };
 
   return (
     <div
@@ -1541,28 +1567,41 @@ function GapControl({
     >
       <button
         className="gap-btn"
-        onClick={() => { if (gap > 0) onChange(gap - 1); }}
-        disabled={gap === 0}
+        onClick={handleMinus}
+        disabled={total <= 1}
       >−</button>
       <div className="gap-dots">
         {showCompact ? (
           <>
-            <span className="gap-dot play" />
-            <span className="gap-compact-rest">
-              <span className="gap-dot rest" />
-              <span className="gap-rest-count">×{gap}</span>
-            </span>
+            {playCount > 1 ? (
+              <span className="gap-compact-play">
+                <span className="gap-dot play" />
+                <span className="gap-play-count">×{playCount}</span>
+              </span>
+            ) : (
+              <span className="gap-dot play" />
+            )}
+            {gap > 0 && (
+              <span className="gap-compact-rest">
+                <span className="gap-dot rest" />
+                <span className="gap-rest-count">×{gap}</span>
+              </span>
+            )}
           </>
         ) : (
           Array.from({ length: total }, (_, i) => (
-            <span key={i} className={`gap-dot ${i === 0 ? "play" : "rest"}`} />
+            <span
+              key={i}
+              className={`gap-dot ${i < playCount ? "play" : "rest"} clickable`}
+              onClick={() => handleDotClick(i)}
+            />
           ))
         )}
       </div>
       <button
         className="gap-btn"
-        onClick={() => { if (gap < 16) onChange(gap + 1); }}
-        disabled={gap >= 16}
+        onClick={handlePlus}
+        disabled={total >= 16}
       >+</button>
     </div>
   );

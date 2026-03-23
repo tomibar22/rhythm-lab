@@ -68,6 +68,7 @@ function layerAudioChanged(a: Layer, b: Layer): boolean {
   if (a.volume !== b.volume) return true;
   if (a.density !== b.density) return true;
   if (a.swing !== b.swing) return true;
+  if (a.playCount !== b.playCount) return true;
   if (a.gap !== b.gap) return true;
   if (a.pattern.length !== b.pattern.length) return true;
   for (let i = 0; i < a.pattern.length; i++) {
@@ -158,6 +159,7 @@ function createLayer(
     color: LAYER_COLORS[index % LAYER_COLORS.length],
     swing: overrides?.swing ?? 0.5,
     density,
+    playCount: overrides?.playCount ?? 1,
     gap: overrides?.gap ?? 0,
     groupId: overrides?.groupId,
   };
@@ -203,6 +205,7 @@ function getInitialState() {
           sound: tl.sound,
           volume: tl.volume,
           density: tl.density,
+          playCount: tl.playCount ?? 1,
           gap: tl.gap,
           swing: tl.swing,
           groupId: tl.groupId,
@@ -489,6 +492,7 @@ export function useRhythmLab() {
         volume: source.volume,
         swing: source.swing,
         density: source.density,
+        playCount: source.playCount,
         gap: source.gap,
         groupId: source.groupId,
       });
@@ -725,6 +729,7 @@ export function useRhythmLab() {
           volume: l.volume,
           swing: l.swing,
           density: l.density,
+          playCount: l.playCount,
           gap: l.gap,
           groupId: newGroupId,
         }),

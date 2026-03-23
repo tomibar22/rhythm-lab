@@ -73,6 +73,7 @@ export function PatternBrowser({
     onUpdateLayer(selectedLayerId, {
       sound: sp.sound,
       density: sp.density,
+      playCount: sp.playCount ?? 1,
       gap: sp.gap,
       swing: sp.swing,
     });

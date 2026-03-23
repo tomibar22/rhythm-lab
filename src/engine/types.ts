@@ -36,7 +36,9 @@ export interface Layer {
   swing: number;
   /** Density for random layers: 0–1 probability of each step firing */
   density: number;
-  /** Gap: number of cycles to rest after each played cycle (0 = no gap) */
+  /** How many cycles to play before resting (default 1) */
+  playCount: number;
+  /** Gap: number of cycles to rest after each play run (0 = no gap) */
   gap: number;
   /** Optional group this layer belongs to */
   groupId?: string;
