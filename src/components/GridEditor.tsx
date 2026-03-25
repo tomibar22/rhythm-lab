@@ -1056,9 +1056,8 @@ function LayerRow({
 
         <div className="layer-controls">
           <GapControl
-            playCount={layer.playCount}
-            gap={layer.gap}
-            onChange={(playCount, gap) => onUpdateLayer({ playCount, gap })}
+            cyclePattern={layer.cyclePattern}
+            onChange={(cyclePattern) => onUpdateLayer({ cyclePattern })}
           />
           <button
             className={`ctrl-btn mute-btn ${layer.muted ? "active" : ""}`}
@@ -1185,6 +1184,29 @@ function LayerRow({
               onClick={(e) => e.stopPropagation()}
             />
             <span className="density-pct">%</span>
+          </div>
+        )}
+
+        {isRandom && (
+          <div
+            className="repeat-control"
+            onClick={(e) => e.stopPropagation()}
+            title={layer.repeatCycles === 0
+              ? "Pure random every cycle (click + to repeat)"
+              : `Repeat same random for ${layer.repeatCycles} extra cycle${layer.repeatCycles > 1 ? "s" : ""}`}
+          >
+            <span className="repeat-label">rpt</span>
+            <button
+              className="repeat-btn"
+              onClick={() => onUpdateLayer({ repeatCycles: Math.max(0, layer.repeatCycles - 1) })}
+              disabled={layer.repeatCycles <= 0}
+            >−</button>
+            <span className="repeat-value">{layer.repeatCycles}</span>
+            <button
+              className="repeat-btn"
+              onClick={() => onUpdateLayer({ repeatCycles: Math.min(16, layer.repeatCycles + 1) })}
+              disabled={layer.repeatCycles >= 16}
+            >+</button>
           </div>
         )}
 
@@ -1525,45 +1547,46 @@ function GroupHeader({
 // ─────────────────────────────────────────────
 
 function GapControl({
-  playCount,
-  gap,
+  cyclePattern,
   onChange,
 }: {
-  playCount: number;
-  gap: number;
-  onChange: (playCount: number, gap: number) => void;
+  cyclePattern: (0 | 1)[];
+  onChange: (cyclePattern: (0 | 1)[]) => void;
 }) {
-  const total = playCount + gap;
-  const tooltip = gap === 0
+  const total = cyclePattern.length;
+  const playCount = cyclePattern.filter((v) => v === 1).length;
+  const hasGap = cyclePattern.some((v) => v === 0);
+
+  const tooltip = !hasGap
     ? "Plays every cycle (click + to add rest cycles)"
-    : `Plays ${playCount} cycle${playCount > 1 ? "s" : ""}, rests ${gap} cycle${gap > 1 ? "s" : ""}`;
-  const showCompact = total > 6;
+    : `${playCount} play, ${total - playCount} rest across ${total} cycles`;
 
-  // Click a rest dot → make it (and everything before) play
-  // Click a play dot → make it (and everything after) rest (min 1 play)
+  // Toggle individual dot — but prevent removing the last play dot
   const handleDotClick = (i: number) => {
-    const isPlay = i < playCount;
-    const newPlay = isPlay ? Math.max(1, i) : i + 1;
-    const newGap = total - newPlay;
-    if (newPlay >= 1 && newGap >= 0) {
-      onChange(newPlay, newGap);
-    }
+    const isPlay = cyclePattern[i] === 1;
+    if (isPlay && playCount <= 1) return;
+    const newPattern = [...cyclePattern] as (0 | 1)[];
+    newPattern[i] = isPlay ? 0 : 1;
+    onChange(newPattern);
   };
 
-  // − removes the last dot (rest first, then play, but keep ≥ 1 play)
+  // − removes last dot (but keep ≥ 1 total and ≥ 1 play)
   const handleMinus = () => {
-    if (gap > 0) onChange(playCount, gap - 1);
-    else if (playCount > 1) onChange(playCount - 1, 0);
+    if (total <= 1) return;
+    const newPattern = cyclePattern.slice(0, -1) as (0 | 1)[];
+    if (newPattern.filter((v) => v === 1).length === 0) return;
+    onChange(newPattern);
   };
 
-  // + adds a rest dot
+  // + adds a rest dot at end
   const handlePlus = () => {
-    if (total < 16) onChange(playCount, gap + 1);
+    if (total >= 16) return;
+    onChange([...cyclePattern, 0] as (0 | 1)[]);
   };
 
   return (
     <div
-      className={`gap-control ${gap > 0 ? "has-gap" : ""}`}
+      className={`gap-control ${hasGap ? "has-gap" : ""}`}
       onClick={(e) => e.stopPropagation()}
       title={tooltip}
     >
@@ -1573,36 +1596,13 @@ function GapControl({
         disabled={total <= 1}
       >−</button>
       <div className="gap-dots">
-        {showCompact ? (
-          <>
-            <span
-              className="gap-compact-play clickable"
-              onClick={() => { if (gap > 0) onChange(playCount + 1, gap - 1); }}
-              title="Click to add a play cycle"
-            >
-              <span className="gap-dot play" />
-              {playCount > 1 && <span className="gap-play-count">×{playCount}</span>}
-            </span>
-            {gap > 0 && (
-              <span
-                className="gap-compact-rest clickable"
-                onClick={() => { if (playCount > 1) onChange(playCount - 1, gap + 1); }}
-                title="Click to add a rest cycle"
-              >
-                <span className="gap-dot rest" />
-                {gap > 1 && <span className="gap-rest-count">×{gap}</span>}
-              </span>
-            )}
-          </>
-        ) : (
-          Array.from({ length: total }, (_, i) => (
-            <span
-              key={i}
-              className={`gap-dot ${i < playCount ? "play" : "rest"} clickable`}
-              onClick={() => handleDotClick(i)}
-            />
-          ))
-        )}
+        {cyclePattern.map((v, i) => (
+          <span
+            key={i}
+            className={`gap-dot ${v === 1 ? "play" : "rest"} clickable ${total > 6 ? "small" : ""}`}
+            onClick={() => handleDotClick(i)}
+          />
+        ))}
       </div>
       <button
         className="gap-btn"

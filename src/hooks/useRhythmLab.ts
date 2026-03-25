@@ -27,6 +27,17 @@ const MAX_STEPS = 128;
 // HELPERS
 // ─────────────────────────────────────────────
 
+/** Convert legacy playCount+gap to cyclePattern. */
+function legacyCyclePattern(playCount?: number, gap?: number): (0 | 1)[] {
+  const p = playCount ?? 1;
+  const g = gap ?? 0;
+  if (p <= 1 && g <= 0) return [1];
+  return [
+    ...Array(p).fill(1) as (0 | 1)[],
+    ...Array(g).fill(0) as (0 | 1)[],
+  ];
+}
+
 /** Adjust layers whose steps match a multiplier preset when cycle length changes. */
 function adjustLayersForCycleChange(
   layers: Layer[],
@@ -68,8 +79,11 @@ function layerAudioChanged(a: Layer, b: Layer): boolean {
   if (a.volume !== b.volume) return true;
   if (a.density !== b.density) return true;
   if (a.swing !== b.swing) return true;
-  if (a.playCount !== b.playCount) return true;
-  if (a.gap !== b.gap) return true;
+  if (a.repeatCycles !== b.repeatCycles) return true;
+  if (a.cyclePattern.length !== b.cyclePattern.length) return true;
+  for (let i = 0; i < a.cyclePattern.length; i++) {
+    if (a.cyclePattern[i] !== b.cyclePattern[i]) return true;
+  }
   if (a.pattern.length !== b.pattern.length) return true;
   for (let i = 0; i < a.pattern.length; i++) {
     if (a.pattern[i] !== b.pattern[i]) return true;
@@ -159,8 +173,8 @@ function createLayer(
     color: LAYER_COLORS[index % LAYER_COLORS.length],
     swing: overrides?.swing ?? 0.5,
     density,
-    playCount: overrides?.playCount ?? 1,
-    gap: overrides?.gap ?? 0,
+    cyclePattern: overrides?.cyclePattern ?? [1],
+    repeatCycles: overrides?.repeatCycles ?? 0,
     groupId: overrides?.groupId,
   };
 }
@@ -205,8 +219,8 @@ function getInitialState() {
           sound: tl.sound,
           volume: tl.volume,
           density: tl.density,
-          playCount: tl.playCount ?? 1,
-          gap: tl.gap,
+          cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
+          repeatCycles: tl.repeatCycles ?? 0,
           swing: tl.swing,
           groupId: tl.groupId,
         }),
@@ -250,6 +264,7 @@ export function useRhythmLab() {
   const [selectedLayerId, setSelectedLayerId] = useState<string>(
     initial.layers[0].id,
   );
+  const [countdown, setCountdown] = useState<0 | 1 | 2>(0);
 
   const engineRef = useRef<AudioEngine | null>(null);
 
@@ -293,6 +308,7 @@ export function useRhythmLab() {
   const cycleBeatsRef = useRef(cycleBeats);
 
   const groupsRef = useRef(groups);
+  const countdownRef = useRef(countdown);
 
   // Keep refs in sync
   isPlayingRef.current = isPlaying;
@@ -300,6 +316,7 @@ export function useRhythmLab() {
   tempoRef.current = tempo;
   cycleBeatsRef.current = cycleBeats;
   groupsRef.current = groups;
+  countdownRef.current = countdown;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -443,10 +460,16 @@ export function useRhythmLab() {
       } else {
         await engine.init();
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
+        const cd = countdownRef.current;
+        const alignTick = cd > 0 ? cd * cycleBeatsRef.current * 960 : 0;
+        if (cd > 0) {
+          engine.scheduleCountdown(cycleBeatsRef.current, cd);
+        }
         engine.scheduleLayers(
           engineLayers,
           cycleBeatsRef.current,
           makeStepCallback(),
+          alignTick,
         );
         engine.play(tempoRef.current);
         justStartedRef.current = true;
@@ -499,8 +522,8 @@ export function useRhythmLab() {
         volume: source.volume,
         swing: source.swing,
         density: source.density,
-        playCount: source.playCount,
-        gap: source.gap,
+        cyclePattern: [...source.cyclePattern],
+        repeatCycles: source.repeatCycles,
         groupId: source.groupId,
       });
       // Insert right after the source layer
@@ -736,8 +759,8 @@ export function useRhythmLab() {
           volume: l.volume,
           swing: l.swing,
           density: l.density,
-          playCount: l.playCount,
-          gap: l.gap,
+          cyclePattern: [...l.cyclePattern],
+          repeatCycles: l.repeatCycles,
           groupId: newGroupId,
         }),
       );
@@ -839,8 +862,8 @@ export function useRhythmLab() {
         sound: tl.sound,
         volume: tl.volume,
         density: tl.density,
-        playCount: tl.playCount ?? 1,
-        gap: tl.gap,
+        cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
+        repeatCycles: tl.repeatCycles ?? 0,
         swing: tl.swing,
         groupId: tl.groupId,
       }),
@@ -877,6 +900,8 @@ export function useRhythmLab() {
     setTempo,
     setCycleBeats: changeCycleBeats,
     pendingCycleChange,
+    countdown,
+    setCountdown,
 
     // Groups
     groups,

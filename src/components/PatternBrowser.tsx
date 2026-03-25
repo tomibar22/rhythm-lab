@@ -73,8 +73,7 @@ export function PatternBrowser({
     onUpdateLayer(selectedLayerId, {
       sound: sp.sound,
       density: sp.density,
-      playCount: sp.playCount ?? 1,
-      gap: sp.gap,
+      cyclePattern: sp.cyclePattern ? [...sp.cyclePattern] : [1],
       swing: sp.swing,
     });
   };
@@ -149,7 +148,7 @@ export function PatternBrowser({
                         <span className="card-name">{sp.name}</span>
                         <span className="card-meta">
                           {sp.type === "random" ? `~${Math.round(sp.density * 100)}%` : `${sp.pattern.filter(v => v === 1).length}/${sp.steps}`}
-                          {sp.gap > 0 && ` g${sp.gap}`}
+                          {sp.cyclePattern && sp.cyclePattern.some(v => v === 0) && ` g${sp.cyclePattern.filter(v => v === 0).length}`}
                         </span>
                       </div>
                       {sp.type === "random" ? (

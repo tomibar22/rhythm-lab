@@ -20,10 +20,10 @@ export interface SavedPattern {
   pattern: (0 | 1)[];
   sound: SoundPreset;
   density: number;
-  playCount?: number;
-  gap: number;
   swing: number;
   savedAt: number;
+  cyclePattern?: (0 | 1)[];
+  repeatCycles?: number;
 }
 
 export interface SavedTemplate {
@@ -44,10 +44,16 @@ export interface SavedTemplateLayer {
   sound: SoundPreset;
   volume: number;
   density: number;
+  /** @deprecated Legacy — use cyclePattern instead */
   playCount?: number;
-  gap: number;
+  /** @deprecated Legacy — use cyclePattern instead */
+  gap?: number;
   swing: number;
   groupId?: string;
+  /** Per-cycle play/rest pattern. If absent, derive from legacy playCount+gap. */
+  cyclePattern?: (0 | 1)[];
+  /** Random repeat cycles. 0 = pure random per step. */
+  repeatCycles?: number;
 }
 
 export interface SavedTemplateGroup {
@@ -85,10 +91,10 @@ export function savePattern(layer: Layer, name: string): SavedPattern {
     pattern: [...layer.pattern],
     sound: layer.sound,
     density: layer.density,
-    playCount: layer.playCount,
-    gap: layer.gap,
     swing: layer.swing,
     savedAt: Date.now(),
+    cyclePattern: [...layer.cyclePattern],
+    ...(layer.repeatCycles > 0 ? { repeatCycles: layer.repeatCycles } : {}),
   };
   const patterns = getSavedPatterns();
   patterns.push(pattern);
@@ -159,9 +165,9 @@ export function saveTemplate(
       sound: l.sound,
       volume: l.volume,
       density: l.density,
-      playCount: l.playCount,
-      gap: l.gap,
       swing: l.swing,
+      cyclePattern: [...l.cyclePattern],
+      ...(l.repeatCycles > 0 ? { repeatCycles: l.repeatCycles } : {}),
       ...(l.groupId ? { groupId: l.groupId } : {}),
     })),
     ...(groups && groups.length > 0 ? { groups } : {}),

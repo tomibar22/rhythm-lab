@@ -5,9 +5,11 @@ interface TransportBarProps {
   tempo: number;
   cycleBeats: number;
   pendingCycleChange: boolean;
+  countdown: 0 | 1 | 2;
   onTogglePlay: () => void;
   onTempoChange: (bpm: number) => void;
   onCycleBeatsChange: (beats: number) => void;
+  onCountdownChange: (value: 0 | 1 | 2) => void;
   children?: ReactNode;
 }
 
@@ -16,9 +18,11 @@ export function TransportBar({
   tempo,
   cycleBeats,
   pendingCycleChange,
+  countdown,
   onTogglePlay,
   onTempoChange,
   onCycleBeatsChange,
+  onCountdownChange,
   children,
 }: TransportBarProps) {
   const [tempoText, setTempoText] = useState(String(tempo));
@@ -251,6 +255,22 @@ export function TransportBar({
             <span className="cycle-pending-dot" />
           </span>
         )}
+      </div>
+
+      <div className="countdown-control" title="Count-in before playback (pip clicks)">
+        <span className="countdown-label">Count</span>
+        <button
+          className={`countdown-option ${countdown === 0 ? "active" : ""}`}
+          onClick={() => onCountdownChange(0)}
+        >off</button>
+        <button
+          className={`countdown-option ${countdown === 1 ? "active" : ""}`}
+          onClick={() => onCountdownChange(1)}
+        >1</button>
+        <button
+          className={`countdown-option ${countdown === 2 ? "active" : ""}`}
+          onClick={() => onCountdownChange(2)}
+        >2</button>
       </div>
 
       <div className="transport-title">

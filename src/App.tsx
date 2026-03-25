@@ -29,9 +29,11 @@ export default function App() {
         tempo={lab.tempo}
         cycleBeats={lab.cycleBeats}
         pendingCycleChange={lab.pendingCycleChange}
+        countdown={lab.countdown}
         onTogglePlay={lab.togglePlay}
         onTempoChange={lab.setTempo}
         onCycleBeatsChange={lab.setCycleBeats}
+        onCountdownChange={lab.setCountdown}
       >
         <TemplateBrowser
           layers={lab.layers}

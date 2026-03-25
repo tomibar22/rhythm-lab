@@ -279,8 +279,7 @@ export class AudioEngine {
   ): { startTick: number; initialCounter: number } {
     const transport = Tone.getTransport();
     const roundedStepTicks = Math.round(cycleTicks / layer.steps);
-    const playCount = layer.playCount ?? 1;
-    const totalStepsPerSuper = layer.steps * (playCount + layer.gap);
+    const totalStepsPerSuper = layer.steps * layer.cyclePattern.length;
 
     const offsetTicks = transport.ticks - alignTick;
     // How many step intervals have elapsed since alignTick?
@@ -367,20 +366,20 @@ export class AudioEngine {
     const synth = this.getOrCreateSynth(layer.id, layer.sound);
     const spec = this.getSpec(layer.sound);
     const stepTicks = cycleTicks / layer.steps;
-    const playCount = layer.playCount ?? 1;
-    const gap = layer.gap;
+    const cyclePattern = layer.cyclePattern;
 
-    // Super-cycle = playCount + gap cycles
-    const superCycleTicks = cycleTicks * (playCount + gap);
+    // Super-cycle = cyclePattern.length cycles
+    const superCycleTicks = cycleTicks * cyclePattern.length;
 
     const accentWeights = computeAccentWeights(layer.pattern, layer.steps, layer.swing);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events: Array<Record<string, any>> = [];
 
-    // Duplicate events for each play cycle within the super-cycle
-    for (let p = 0; p < playCount; p++) {
-      const cycleOffset = p * cycleTicks;
+    // Place events only in play-cycles (cyclePattern[c] === 1)
+    for (let c = 0; c < cyclePattern.length; c++) {
+      if (cyclePattern[c] !== 1) continue;
+      const cycleOffset = c * cycleTicks;
       for (let i = 0; i < layer.steps; i++) {
         if (layer.pattern[i] !== 1) continue;
 
@@ -438,33 +437,56 @@ export class AudioEngine {
     const density = layer.density;
     const swing = layer.swing;
     const steps = layer.steps;
-    const playCount = layer.playCount ?? 1;
-    const gap = layer.gap;
+    const cyclePattern = [...layer.cyclePattern];
     const allowedMask = [...layer.pattern]; // 1 = allowed, 0 = forbidden
-    const totalStepsPerSuper = steps * (playCount + gap);
+    const totalStepsPerSuper = steps * cyclePattern.length;
     const roundedStepTicks = Math.round(stepTicks);
+    const repeatCycles = layer.repeatCycles ?? 0;
 
     // Counter-based step tracking: increments exactly once per loop callback.
     // initialCounter allows resuming mid-cycle (e.g., after density change)
     // so the layer stays in sync with the cycle position.
     let stepCounter = initialCounter;
 
+    // Repeat feature: cache random hits and replay for N extra play-cycles
+    let cachedHits: boolean[] | null = null;
+    let playCycleCount = 0;
+
     const loop = new Tone.Loop((time: number) => {
       const superStep = stepCounter % totalStepsPerSuper;
       const currentStep = superStep % steps;
-      const isInPlayCycle = superStep < steps * playCount;
+      const cycleIdx = Math.floor(superStep / steps);
+      const isPlayCycle = cyclePattern[cycleIdx] === 1;
       stepCounter++;
 
-      if (isInPlayCycle) {
-        let triggerTime = time;
-        if (swing !== 0.5 && currentStep % 2 === 1) {
-          const straightInterval = Tone.Ticks(stepTicks).toSeconds();
-          const swungOffset = (swing - 0.5) * 2 * straightInterval;
-          triggerTime = time + swungOffset;
+      if (isPlayCycle) {
+        // At start of play-cycle, decide whether to regenerate random hits
+        if (currentStep === 0) {
+          if (repeatCycles === 0) {
+            cachedHits = null; // per-step random (default behavior)
+          } else if (playCycleCount % (1 + repeatCycles) === 0) {
+            cachedHits = Array.from({ length: steps }, (_, i) =>
+              allowedMask[i] === 1 && Math.random() < density,
+            );
+          }
+          playCycleCount++;
         }
 
-        // pattern[step] === 0 means "forbidden" — never fires
-        if (allowedMask[currentStep] === 1 && Math.random() < density) {
+        let shouldFire: boolean;
+        if (cachedHits) {
+          shouldFire = cachedHits[currentStep];
+        } else {
+          shouldFire = allowedMask[currentStep] === 1 && Math.random() < density;
+        }
+
+        if (shouldFire) {
+          let triggerTime = time;
+          if (swing !== 0.5 && currentStep % 2 === 1) {
+            const straightInterval = Tone.Ticks(stepTicks).toSeconds();
+            const swungOffset = (swing - 0.5) * 2 * straightInterval;
+            triggerTime = time + swungOffset;
+          }
+
           if (layerVolume > 0) {
             const rawVol = (100 / 127) * layerVolume;
             const vol = humanizeVelocity(rawVol, 1.0);
@@ -479,6 +501,33 @@ export class AudioEngine {
 
     loop.start(`${alignTick}i`);
     this.addLayerEvent(layerId, loop);
+  }
+
+  /**
+   * Schedule countdown pip clicks before layer playback begins.
+   * Non-looping — plays once then the layers take over.
+   */
+  scheduleCountdown(cycleBeats: number, countdownBars: number): void {
+    const spec = this.getSpec("pip");
+    const synth = this.getOrCreateSynth("__countdown__", "pip");
+    const totalBeats = countdownBars * cycleBeats;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events: Array<Record<string, any>> = [];
+    for (let i = 0; i < totalBeats; i++) {
+      // First beat of each bar gets a slightly louder accent
+      const isBarStart = i % cycleBeats === 0;
+      events.push({ time: `${i * APP_PPQ}i`, vol: isBarStart ? 0.7 : 0.4 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const part = new Tone.Part((time: number, event: any) => {
+      this.triggerSynth(synth, spec, time, event.vol);
+    }, events);
+
+    part.loop = false;
+    part.start("0i");
+    this.addLayerEvent("__countdown__", part);
   }
 
   play(tempo: number): void {
