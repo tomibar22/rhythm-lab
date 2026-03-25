@@ -446,6 +446,8 @@ export class AudioEngine {
     const totalStepsPerSuper = steps * cyclePattern.length;
     const roundedStepTicks = Math.round(stepTicks);
     const repeatCycles = layer.repeatCycles ?? 0;
+    const hitsPerCycle = layer.hitsPerCycle ?? 0;
+    const allowedIndices = allowedMask.reduce<number[]>((acc, v, i) => { if (v === 1) acc.push(i); return acc; }, []);
 
     // Counter-based step tracking: increments exactly once per loop callback.
     // initialCounter allows resuming mid-cycle (e.g., after density change)
@@ -455,6 +457,19 @@ export class AudioEngine {
     // Repeat feature: cache random hits and replay for N extra play-cycles
     let cachedHits: boolean[] | null = null;
     let playCycleCount = 0;
+
+    /** Generate exactly N random hits from allowed steps (Fisher-Yates partial shuffle). */
+    const generateExactHits = (n: number): boolean[] => {
+      const result = new Array<boolean>(steps).fill(false);
+      const pool = [...allowedIndices];
+      const count = Math.min(n, pool.length);
+      for (let i = 0; i < count; i++) {
+        const j = i + Math.floor(Math.random() * (pool.length - i));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+        result[pool[i]] = true;
+      }
+      return result;
+    };
 
     const loop = new Tone.Loop((time: number) => {
       const superStep = stepCounter % totalStepsPerSuper;
@@ -466,7 +481,12 @@ export class AudioEngine {
       if (isPlayCycle) {
         // At start of play-cycle, decide whether to regenerate random hits
         if (currentStep === 0) {
-          if (repeatCycles === 0) {
+          if (hitsPerCycle > 0) {
+            // Exact hits mode: always generate cached hits
+            if (repeatCycles === 0 || playCycleCount % (1 + repeatCycles) === 0) {
+              cachedHits = generateExactHits(hitsPerCycle);
+            }
+          } else if (repeatCycles === 0) {
             cachedHits = null; // per-step random (default behavior)
           } else if (playCycleCount % (1 + repeatCycles) === 0) {
             cachedHits = Array.from({ length: steps }, (_, i) =>

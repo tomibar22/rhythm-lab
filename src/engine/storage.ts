@@ -24,6 +24,7 @@ export interface SavedPattern {
   savedAt: number;
   cyclePattern?: (0 | 1)[];
   repeatCycles?: number;
+  hitsPerCycle?: number;
 }
 
 export interface SavedTemplate {
@@ -54,6 +55,8 @@ export interface SavedTemplateLayer {
   cyclePattern?: (0 | 1)[];
   /** Random repeat cycles. 0 = pure random per step. */
   repeatCycles?: number;
+  /** Exact hits per cycle. 0 = density mode. */
+  hitsPerCycle?: number;
 }
 
 export interface SavedTemplateGroup {
@@ -61,6 +64,7 @@ export interface SavedTemplateGroup {
   name: string;
   volume: number;
   gap?: number;
+  cyclePattern?: (0 | 1)[];
 }
 
 // ─────────────────────────────────────────────
@@ -168,6 +172,7 @@ export function saveTemplate(
       swing: l.swing,
       cyclePattern: [...l.cyclePattern],
       ...(l.repeatCycles > 0 ? { repeatCycles: l.repeatCycles } : {}),
+      ...(l.hitsPerCycle > 0 ? { hitsPerCycle: l.hitsPerCycle } : {}),
       ...(l.groupId ? { groupId: l.groupId } : {}),
     })),
     ...(groups && groups.length > 0 ? { groups } : {}),

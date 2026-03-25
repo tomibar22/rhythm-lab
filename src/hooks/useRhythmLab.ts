@@ -80,6 +80,7 @@ function layerAudioChanged(a: Layer, b: Layer): boolean {
   if (a.density !== b.density) return true;
   if (a.swing !== b.swing) return true;
   if (a.repeatCycles !== b.repeatCycles) return true;
+  if (a.hitsPerCycle !== b.hitsPerCycle) return true;
   if (a.cyclePattern.length !== b.cyclePattern.length) return true;
   for (let i = 0; i < a.cyclePattern.length; i++) {
     if (a.cyclePattern[i] !== b.cyclePattern[i]) return true;
@@ -119,11 +120,13 @@ function getEngineReadyLayers(layers: Layer[], groups: LayerGroup[]): Layer[] {
     const group = groupMap.get(l.groupId);
     if (!group) return l;
     const silenced = group.muted || (hasGroupSolo && !group.solo);
-    if (!silenced && group.volume === 1) return l;
+    const groupGapActive = group.cyclePattern.length > 1;
+    if (!silenced && group.volume === 1 && !groupGapActive) return l;
     return {
       ...l,
       muted: l.muted || silenced,
       volume: l.volume * group.volume,
+      ...(groupGapActive ? { cyclePattern: [...group.cyclePattern] } : {}),
     };
   });
 }
@@ -175,6 +178,7 @@ function createLayer(
     density,
     cyclePattern: overrides?.cyclePattern ?? [1],
     repeatCycles: overrides?.repeatCycles ?? 0,
+    hitsPerCycle: overrides?.hitsPerCycle ?? 0,
     groupId: overrides?.groupId,
   };
 }
@@ -221,6 +225,7 @@ function getInitialState() {
           density: tl.density,
           cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
           repeatCycles: tl.repeatCycles ?? 0,
+          hitsPerCycle: tl.hitsPerCycle ?? 0,
           swing: tl.swing,
           groupId: tl.groupId,
         }),
@@ -233,6 +238,7 @@ function getInitialState() {
         solo: false,
         volume: g.volume ?? 1,
         gap: g.gap ?? 0,
+        cyclePattern: g.cyclePattern ? [...g.cyclePattern] : [1] as (0 | 1)[],
       }));
       return {
         layers,
@@ -528,6 +534,7 @@ export function useRhythmLab() {
         density: source.density,
         cyclePattern: [...source.cyclePattern],
         repeatCycles: source.repeatCycles,
+        hitsPerCycle: source.hitsPerCycle,
         groupId: source.groupId,
       });
       // Insert right after the source layer
@@ -698,6 +705,7 @@ export function useRhythmLab() {
         solo: false,
         gap: 0,
         volume: 1,
+        cyclePattern: [1],
       }];
     });
   }, []);
@@ -765,6 +773,7 @@ export function useRhythmLab() {
           density: l.density,
           cyclePattern: [...l.cyclePattern],
           repeatCycles: l.repeatCycles,
+          hitsPerCycle: l.hitsPerCycle,
           groupId: newGroupId,
         }),
       );
@@ -880,6 +889,7 @@ export function useRhythmLab() {
       solo: false,
       volume: g.volume ?? 1,
       gap: g.gap ?? 0,
+      cyclePattern: g.cyclePattern ? [...g.cyclePattern] : [1] as (0 | 1)[],
     }));
     setLayers(newLayers);
     setGroups(newGroups);

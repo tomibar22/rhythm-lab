@@ -53,7 +53,7 @@ export function TemplateBrowser({
   const handleSave = () => {
     const name = saveName.trim() || `Template ${templates.length + 1}`;
     const savedGroups = groups.length > 0
-      ? groups.map((g) => ({ id: g.id, name: g.name, volume: g.volume }))
+      ? groups.map((g) => ({ id: g.id, name: g.name, volume: g.volume, ...(g.cyclePattern.length > 1 ? { cyclePattern: [...g.cyclePattern] } : {}) }))
       : undefined;
     saveTemplate(name, layers, tempo, cycleBeats, effectiveOverwriteId || undefined, savedGroups);
     setTemplates(getSavedTemplates());

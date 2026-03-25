@@ -36,6 +36,8 @@ export interface Layer {
   swing: number;
   /** Density for random layers: 0–1 probability of each step firing */
   density: number;
+  /** Random layers only: exact number of hits per cycle. 0 = use density mode. */
+  hitsPerCycle: number;
   /** Per-cycle play/rest pattern: 1 = play, 0 = rest. Loops. Default [1] = every cycle. */
   cyclePattern: (0 | 1)[];
   /** Random layers only: repeat the same random result for N extra play-cycles before regenerating. 0 = pure random. */
@@ -56,8 +58,10 @@ export interface LayerGroup {
   solo: boolean;
   /** Group volume multiplier 0–1, applied on top of individual layer volumes */
   volume: number;
-  /** @deprecated Group gap — unused, kept for storage compat */
+  /** @deprecated Legacy gap — use cyclePattern instead */
   gap: number;
+  /** Per-cycle play/rest pattern for all group members. [1] = inactive (layers use own). Length > 1 = active (overrides layers). */
+  cyclePattern: (0 | 1)[];
 }
 
 // ─────────────────────────────────────────────

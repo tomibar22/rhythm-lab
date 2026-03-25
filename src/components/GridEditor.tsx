@@ -460,6 +460,7 @@ export function GridEditor({
       onHandlePointerDown={(e) => handleDragHandlePointerDown(
         e, layer.id, layer.name, layer.color,
       )}
+      groupGapActive={inGroup && layer.groupId ? (groupMap.get(layer.groupId)?.cyclePattern.length ?? 1) > 1 : false}
     />
   );
 
@@ -690,6 +691,7 @@ interface LayerRowProps {
   onClear: () => void;
   onUngroupLayer?: () => void;
   onHandlePointerDown: (e: React.PointerEvent) => void;
+  groupGapActive?: boolean;
 }
 
 function LayerRow({
@@ -713,6 +715,7 @@ function LayerRow({
   onClear,
   onUngroupLayer,
   onHandlePointerDown,
+  groupGapActive,
 }: LayerRowProps) {
   // ── Step painting state ──
   const paintModeRef = useRef<0 | 1 | null>(null); // null = not painting
@@ -1055,10 +1058,18 @@ function LayerRow({
         </div>
 
         <div className="layer-controls">
-          <GapControl
-            cyclePattern={layer.cyclePattern}
-            onChange={(cyclePattern) => onUpdateLayer({ cyclePattern })}
-          />
+          {groupGapActive ? (
+            <div className="gap-control group-controlled" title="Controlled by group gap">
+              <div className="gap-dots">
+                <span className="gap-dot play" />
+              </div>
+            </div>
+          ) : (
+            <GapControl
+              cyclePattern={layer.cyclePattern}
+              onChange={(cyclePattern) => onUpdateLayer({ cyclePattern })}
+            />
+          )}
           <button
             className={`ctrl-btn mute-btn ${layer.muted ? "active" : ""}`}
             onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
@@ -1160,31 +1171,78 @@ function LayerRow({
         </div>
 
         {isRandom && (
-          <div
-            className={`density-control ${densityEditing ? "editing" : ""}`}
-            onPointerDown={handleDensityPointerDown}
-            onDoubleClick={handleDensityDoubleClick}
-            onWheel={handleDensityWheel}
-            title="Drag to adjust density, double-click to type"
-          >
-            <span className="density-label">density</span>
-            <input
-              ref={densityInputRef}
-              className="density-input"
-              type="text"
-              inputMode="numeric"
-              readOnly={!densityEditing}
-              value={densityText}
-              onChange={(e) => setDensityText(e.target.value)}
-              onBlur={() => { commitDensity(); setDensityEditing(false); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { commitDensity(); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
-                else if (e.key === "Escape") { setDensityText(String(Math.round(layer.density * 100))); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
-              }}
+          layer.hitsPerCycle > 0 ? (
+            <div
+              className="density-control hits-mode"
               onClick={(e) => e.stopPropagation()}
-            />
-            <span className="density-pct">%</span>
-          </div>
+              title="Exact hits per cycle. Click 🎲 to switch to density mode"
+            >
+              <button
+                className="mode-toggle"
+                onClick={() => onUpdateLayer({ hitsPerCycle: 0 })}
+                title="Switch to density (probability) mode"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="2" y="2" width="20" height="20" rx="4" fill="none" stroke="currentColor" strokeWidth="2.5"/>
+                  <circle cx="8" cy="8" r="2"/><circle cx="16" cy="8" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/>
+                </svg>
+              </button>
+              <span className="density-label">hits</span>
+              <button
+                className="hits-btn"
+                onClick={() => onUpdateLayer({ hitsPerCycle: Math.max(1, layer.hitsPerCycle - 1) })}
+                disabled={layer.hitsPerCycle <= 1}
+              >−</button>
+              <span className="hits-value">{layer.hitsPerCycle}</span>
+              <button
+                className="hits-btn"
+                onClick={() => {
+                  const maxHits = layer.pattern.filter(v => v === 1).length;
+                  onUpdateLayer({ hitsPerCycle: Math.min(maxHits, layer.hitsPerCycle + 1) });
+                }}
+                disabled={layer.hitsPerCycle >= layer.pattern.filter(v => v === 1).length}
+              >+</button>
+              <span className="hits-of">/{layer.pattern.filter(v => v === 1).length}</span>
+            </div>
+          ) : (
+            <div
+              className={`density-control ${densityEditing ? "editing" : ""}`}
+              onPointerDown={handleDensityPointerDown}
+              onDoubleClick={handleDensityDoubleClick}
+              onWheel={handleDensityWheel}
+              title="Drag to adjust density, double-click to type. Click # to switch to exact hits mode"
+            >
+              <button
+                className="mode-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const maxHits = layer.pattern.filter(v => v === 1).length;
+                  const estimated = Math.max(1, Math.round(layer.density * maxHits));
+                  onUpdateLayer({ hitsPerCycle: estimated });
+                }}
+                title="Switch to exact hits mode"
+              >#</button>
+              <span className="density-label">density</span>
+              <input
+                ref={densityInputRef}
+                className="density-input"
+                type="text"
+                inputMode="numeric"
+                readOnly={!densityEditing}
+                value={densityText}
+                onChange={(e) => setDensityText(e.target.value)}
+                onBlur={() => { commitDensity(); setDensityEditing(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { commitDensity(); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
+                  else if (e.key === "Escape") { setDensityText(String(Math.round(layer.density * 100))); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <span className="density-pct">%</span>
+            </div>
+          )
         )}
 
         {activeMultiplier === 2 && (
@@ -1535,6 +1593,10 @@ function GroupHeader({
             }}
           />
         </div>
+        <GapControl
+          cyclePattern={group.cyclePattern}
+          onChange={(cyclePattern) => onUpdateGroup({ cyclePattern })}
+        />
         <button className="ctrl-btn clear-btn" onClick={onClear} title="Clear group patterns">CLR</button>
         <button className="ctrl-btn dup-btn" onClick={onDuplicate} title="Duplicate group">DUP</button>
         <button
