@@ -558,7 +558,8 @@ export class AudioEngine {
     const transport = Tone.getTransport();
     transport.bpm.value = tempo;
     transport.position = 0;
-    this.cycleAlignTick = 0;
+    // Don't reset cycleAlignTick — scheduleLayers already set it
+    // (e.g., for countdown offset)
     transport.start();
   }
 
