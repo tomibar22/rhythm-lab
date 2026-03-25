@@ -1223,7 +1223,12 @@ function LayerRow({
               ? "Pure random every cycle (click + to repeat)"
               : `Repeat same random for ${layer.repeatCycles} extra cycle${layer.repeatCycles > 1 ? "s" : ""}`}
           >
-            <span className="repeat-label">rpt</span>
+            <svg className="repeat-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 2l4 4-4 4" />
+              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+              <path d="M7 22l-4-4 4-4" />
+              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+            </svg>
             <button
               className="repeat-btn"
               onClick={() => onUpdateLayer({ repeatCycles: Math.max(0, layer.repeatCycles - 1) })}

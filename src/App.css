@@ -345,7 +345,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font-mono);
   cursor: pointer;
   display: flex;
@@ -968,11 +968,10 @@ body {
   user-select: none;
 }
 
-.repeat-label {
-  font-family: var(--font-mono);
-  font-size: 12px;
+.repeat-icon {
   color: var(--text-muted);
   margin-right: 2px;
+  flex-shrink: 0;
 }
 
 .repeat-value {
