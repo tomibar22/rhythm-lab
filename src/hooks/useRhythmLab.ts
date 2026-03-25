@@ -610,8 +610,13 @@ export function useRhythmLab() {
             }
           }
 
-          // If density changed on a random layer — no pattern change needed
-          // (pattern is forbidden mask, not display)
+          // Clamp hitsPerCycle to allowed steps count
+          if (updated.hitsPerCycle > 0) {
+            const maxHits = updated.pattern.filter((v) => v === 1).length;
+            if (updated.hitsPerCycle > maxHits) {
+              updated.hitsPerCycle = maxHits;
+            }
+          }
 
           return updated;
         }),
