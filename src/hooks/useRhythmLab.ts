@@ -433,23 +433,30 @@ export function useRhythmLab() {
   // ── Transport ──
 
   const togglePlay = useCallback(async () => {
-    const engine = getEngine();
-    // Use ref to avoid stale closure on isPlaying
-    if (isPlayingRef.current) {
-      engine.stop();
+    try {
+      const engine = getEngine();
+      // Use ref to avoid stale closure on isPlaying
+      if (isPlayingRef.current) {
+        engine.stop();
+        setIsPlaying(false);
+        setActiveSteps({});
+      } else {
+        await engine.init();
+        const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
+        engine.scheduleLayers(
+          engineLayers,
+          cycleBeatsRef.current,
+          makeStepCallback(),
+        );
+        engine.play(tempoRef.current);
+        justStartedRef.current = true;
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.error("[Rhythm Lab] togglePlay failed:", err);
+      // Reset to stopped state so the UI isn't stuck
       setIsPlaying(false);
       setActiveSteps({});
-    } else {
-      await engine.init();
-      const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
-      engine.scheduleLayers(
-        engineLayers,
-        cycleBeatsRef.current,
-        makeStepCallback(),
-      );
-      engine.play(tempoRef.current);
-      justStartedRef.current = true;
-      setIsPlaying(true);
     }
   }, [getEngine, makeStepCallback]);
 

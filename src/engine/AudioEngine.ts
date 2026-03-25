@@ -128,7 +128,7 @@ export class AudioEngine {
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
-    return SOUND_PRESETS.find((s) => s.value === sound)!;
+    return SOUND_PRESETS.find((s) => s.value === sound) ?? SOUND_PRESETS[0];
   }
 
   private getOrCreateSynth(
@@ -169,15 +169,20 @@ export class AudioEngine {
     time: number,
     vol: number,
   ): void {
-    if (synth instanceof Tone.NoiseSynth) {
-      synth.triggerAttackRelease(spec.decay, time, vol);
-    } else {
-      (synth as Tone.Synth).triggerAttackRelease(
-        spec.freq,
-        spec.decay,
-        time,
-        vol,
-      );
+    try {
+      if (synth.disposed) return;
+      if (synth instanceof Tone.NoiseSynth) {
+        synth.triggerAttackRelease(spec.decay, time, vol);
+      } else {
+        (synth as Tone.Synth).triggerAttackRelease(
+          spec.freq,
+          spec.decay,
+          time,
+          vol,
+        );
+      }
+    } catch {
+      // Synth may have been disposed between check and trigger — ignore
     }
   }
 
@@ -193,8 +198,12 @@ export class AudioEngine {
     const events = this.layerEvents.get(layerId);
     if (events) {
       for (const e of events) {
-        e.stop();
-        e.dispose();
+        try {
+          e.stop();
+          e.dispose();
+        } catch {
+          // Part/Loop may already be disposed
+        }
       }
       this.layerEvents.delete(layerId);
     }
@@ -524,9 +533,12 @@ export class AudioEngine {
     this.clearAllParts();
     this.stop();
     for (const synth of this.synths.values()) {
-      synth.dispose();
+      try {
+        if (!synth.disposed) synth.dispose();
+      } catch {
+        // ignore disposal errors
+      }
     }
     this.synths.clear();
-    // reset
   }
 }
