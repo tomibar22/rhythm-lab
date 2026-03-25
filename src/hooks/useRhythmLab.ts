@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Layer, LayerType, LayerGroup, LAYER_COLORS } from "../engine/types";
+import { Layer, LayerType, LayerGroup, LAYER_COLORS, SOUND_PRESETS, SoundPreset } from "../engine/types";
 import { AudioEngine } from "../engine/AudioEngine";
 import { euclidean } from "../engine/RhythmEngine";
 import {
@@ -146,6 +146,23 @@ export interface GroupActions {
   moveLayerToGroup: (layerId: string, groupId: string | undefined, targetIndex?: number) => void;
   /** Move an entire group's layer block to a new position in the flat layers array. */
   reorderGroupBlock: (groupId: string, targetLayerIndex: number) => void;
+}
+
+/** Pick a sound not yet used by existing layers; if all taken, pick the least-used. */
+function pickUnusedSound(existingLayers: Layer[]): SoundPreset {
+  const allSounds = SOUND_PRESETS.map((s) => s.value);
+  const usedCounts = new Map<SoundPreset, number>();
+  for (const l of existingLayers) {
+    usedCounts.set(l.sound, (usedCounts.get(l.sound) ?? 0) + 1);
+  }
+  const unused = allSounds.filter((s) => !usedCounts.has(s));
+  if (unused.length > 0) {
+    return unused[Math.floor(Math.random() * unused.length)];
+  }
+  // All taken — pick the least-used (random among ties)
+  const minCount = Math.min(...allSounds.map((s) => usedCounts.get(s) ?? 0));
+  const leastUsed = allSounds.filter((s) => (usedCounts.get(s) ?? 0) === minCount);
+  return leastUsed[Math.floor(Math.random() * leastUsed.length)];
 }
 
 function createLayer(
@@ -512,7 +529,7 @@ export function useRhythmLab() {
 
   const addLayer = useCallback((type: LayerType = "manual") => {
     setLayers((prev) => {
-      const newLayer = createLayer(prev.length, { type });
+      const newLayer = createLayer(prev.length, { type, sound: pickUnusedSound(prev) });
       return [...prev, newLayer];
     });
   }, []);
@@ -785,7 +802,7 @@ export function useRhythmLab() {
 
   const addLayerToGroup = useCallback((groupId: string, type: LayerType = "manual") => {
     setLayers((prev) => {
-      const newLayer = createLayer(prev.length, { type, groupId });
+      const newLayer = createLayer(prev.length, { type, groupId, sound: pickUnusedSound(prev) });
       // Insert after last layer of the group (or append if group has no layers yet)
       const lastIdx = prev.reduce((acc, l, i) => l.groupId === groupId ? i : acc, -1);
       if (lastIdx === -1) return [...prev, newLayer];
