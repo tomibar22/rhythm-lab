@@ -265,7 +265,7 @@ export function TransportBar({
         >off</button>
         {cycleBeats % 2 === 0 && (
           <button
-            className={`countdown-option ${countdown === 0.5 ? "active" : ""}`}
+            className={`countdown-option countdown-half ${countdown === 0.5 ? "active" : ""}`}
             onClick={() => onCountdownChange(0.5)}
           >½</button>
         )}
