@@ -462,15 +462,16 @@ export function useRhythmLab() {
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
         const cd = countdownRef.current;
         const alignTick = cd > 0 ? cd * cycleBeatsRef.current * 960 : 0;
-        if (cd > 0) {
-          engine.scheduleCountdown(cycleBeatsRef.current, cd);
-        }
         engine.scheduleLayers(
           engineLayers,
           cycleBeatsRef.current,
           makeStepCallback(),
           alignTick,
         );
+        // Schedule countdown AFTER scheduleLayers (which clears all parts)
+        if (cd > 0) {
+          engine.scheduleCountdown(cycleBeatsRef.current, cd);
+        }
         engine.play(tempoRef.current);
         justStartedRef.current = true;
         setIsPlaying(true);

@@ -344,7 +344,7 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 12px;
   font-family: var(--font-mono);
   cursor: pointer;
@@ -360,9 +360,10 @@ body {
 }
 
 .countdown-option.active {
-  background: var(--accent);
+  background: rgba(123, 108, 240, 0.25);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .transport-title {

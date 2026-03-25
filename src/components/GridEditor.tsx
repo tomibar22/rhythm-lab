@@ -1187,29 +1187,6 @@ function LayerRow({
           </div>
         )}
 
-        {isRandom && (
-          <div
-            className="repeat-control"
-            onClick={(e) => e.stopPropagation()}
-            title={layer.repeatCycles === 0
-              ? "Pure random every cycle (click + to repeat)"
-              : `Repeat same random for ${layer.repeatCycles} extra cycle${layer.repeatCycles > 1 ? "s" : ""}`}
-          >
-            <span className="repeat-label">rpt</span>
-            <button
-              className="repeat-btn"
-              onClick={() => onUpdateLayer({ repeatCycles: Math.max(0, layer.repeatCycles - 1) })}
-              disabled={layer.repeatCycles <= 0}
-            >−</button>
-            <span className="repeat-value">{layer.repeatCycles}</span>
-            <button
-              className="repeat-btn"
-              onClick={() => onUpdateLayer({ repeatCycles: Math.min(16, layer.repeatCycles + 1) })}
-              disabled={layer.repeatCycles >= 16}
-            >+</button>
-          </div>
-        )}
-
         {activeMultiplier === 2 && (
           <div
             className={`swing-control ${swingEditing ? "editing" : ""}`}
@@ -1235,6 +1212,29 @@ function LayerRow({
               onClick={(e) => e.stopPropagation()}
             />
             <span className="swing-pct">%</span>
+          </div>
+        )}
+
+        {isRandom && (
+          <div
+            className="repeat-control"
+            onClick={(e) => e.stopPropagation()}
+            title={layer.repeatCycles === 0
+              ? "Pure random every cycle (click + to repeat)"
+              : `Repeat same random for ${layer.repeatCycles} extra cycle${layer.repeatCycles > 1 ? "s" : ""}`}
+          >
+            <span className="repeat-label">rpt</span>
+            <button
+              className="repeat-btn"
+              onClick={() => onUpdateLayer({ repeatCycles: Math.max(0, layer.repeatCycles - 1) })}
+              disabled={layer.repeatCycles <= 0}
+            >−</button>
+            <span className="repeat-value">{layer.repeatCycles}</span>
+            <button
+              className="repeat-btn"
+              onClick={() => onUpdateLayer({ repeatCycles: Math.min(16, layer.repeatCycles + 1) })}
+              disabled={layer.repeatCycles >= 16}
+            >+</button>
           </div>
         )}
       </div>

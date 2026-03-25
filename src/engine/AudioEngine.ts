@@ -105,7 +105,8 @@ function computeAccentWeights(
 export class AudioEngine {
   private synths = new Map<string, Tone.Synth | Tone.NoiseSynth>();
   /** Per-layer scheduled events (Part or Loop). */
-  private layerEvents = new Map<string, { stop: () => void; dispose: () => void }[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private layerEvents = new Map<string, any[]>();
   /** Tick offset for cycle-aligned progress calculation. */
   private cycleAlignTick = 0;
   /** The cycle length the engine is currently using for scheduling. */
@@ -188,7 +189,8 @@ export class AudioEngine {
 
   // ── Per-layer part management ──
 
-  private addLayerEvent(layerId: string, event: { stop: () => void; dispose: () => void }): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private addLayerEvent(layerId: string, event: any): void {
     const events = this.layerEvents.get(layerId) ?? [];
     events.push(event);
     this.layerEvents.set(layerId, events);
@@ -199,6 +201,8 @@ export class AudioEngine {
     if (events) {
       for (const e of events) {
         try {
+          // Cancel pending events in the transport lookahead before stopping
+          if (typeof e.cancel === "function") e.cancel(0);
           e.stop();
           e.dispose();
         } catch {
@@ -508,8 +512,8 @@ export class AudioEngine {
    * Non-looping — plays once then the layers take over.
    */
   scheduleCountdown(cycleBeats: number, countdownBars: number): void {
-    const spec = this.getSpec("pip");
-    const synth = this.getOrCreateSynth("__countdown__", "pip");
+    const spec = this.getSpec("ping");
+    const synth = this.getOrCreateSynth("__countdown__", "ping");
     const totalBeats = countdownBars * cycleBeats;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
