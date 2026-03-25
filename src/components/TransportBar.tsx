@@ -5,11 +5,11 @@ interface TransportBarProps {
   tempo: number;
   cycleBeats: number;
   pendingCycleChange: boolean;
-  countdown: 0 | 1 | 2;
+  countdown: 0 | 0.5 | 1 | 2;
   onTogglePlay: () => void;
   onTempoChange: (bpm: number) => void;
   onCycleBeatsChange: (beats: number) => void;
-  onCountdownChange: (value: 0 | 1 | 2) => void;
+  onCountdownChange: (value: 0 | 0.5 | 1 | 2) => void;
   children?: ReactNode;
 }
 
@@ -257,12 +257,18 @@ export function TransportBar({
         )}
       </div>
 
-      <div className="countdown-control" title="Count-in before playback (pip clicks)">
+      <div className="countdown-control" title="Count-in before playback (ping clicks)">
         <span className="countdown-label">Count</span>
         <button
           className={`countdown-option ${countdown === 0 ? "active" : ""}`}
           onClick={() => onCountdownChange(0)}
         >off</button>
+        {cycleBeats % 2 === 0 && (
+          <button
+            className={`countdown-option ${countdown === 0.5 ? "active" : ""}`}
+            onClick={() => onCountdownChange(0.5)}
+          >½</button>
+        )}
         <button
           className={`countdown-option ${countdown === 1 ? "active" : ""}`}
           onClick={() => onCountdownChange(1)}

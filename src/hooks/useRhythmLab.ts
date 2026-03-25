@@ -264,7 +264,10 @@ export function useRhythmLab() {
   const [selectedLayerId, setSelectedLayerId] = useState<string>(
     initial.layers[0].id,
   );
-  const [countdown, setCountdown] = useState<0 | 1 | 2>(0);
+  const [countdownRaw, setCountdownRaw] = useState<0 | 0.5 | 1 | 2>(0);
+  // Auto-fallback: if ½ is selected but cycle is now odd, treat as off
+  const countdown = (countdownRaw === 0.5 && cycleBeats % 2 !== 0) ? 0 : countdownRaw;
+  const setCountdown = setCountdownRaw;
 
   const engineRef = useRef<AudioEngine | null>(null);
 
