@@ -6,6 +6,7 @@ import { CircleView } from "./components/CircleView";
 import { PatternBrowser } from "./components/PatternBrowser";
 import { TemplateBrowser } from "./components/TemplateBrowser";
 import { CountdownOverlay } from "./components/CountdownOverlay";
+import { ExerciseBrowser } from "./components/ExerciseBrowser";
 
 export default function App() {
   const lab = useRhythmLab();
@@ -78,6 +79,8 @@ export default function App() {
           />
         </div>
       </div>
+
+      <ExerciseBrowser onLoadTemplate={lab.loadTemplate} />
 
       {selectedLayer && (
         <PatternBrowser
