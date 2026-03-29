@@ -9,6 +9,7 @@
  * 1. Experiment in the app until you find a good workflow
  * 2. Describe the exercise, steps, and starting template
  * 3. Add it to the EXERCISES array below
+ * 4. Always include `countdown: 1` in the template (1-cycle count-in)
  */
 
 import { SavedTemplate } from "./storage";
@@ -50,6 +51,7 @@ export const EXERCISES: Exercise[] = [
       name: "Find the Space",
       tempo: 95,
       cycleBeats: 4,
+      countdown: 1,
       layers: [
         { name: "Pulse", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.85, density: 0.5, swing: 0.5 },
         { name: "Phrase", type: "random", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "tap", volume: 0.65, density: 0.5, swing: 0.5, hitsPerCycle: 7, repeatCycles: 1 },
@@ -77,6 +79,7 @@ export const EXERCISES: Exercise[] = [
       name: "One Note Grows",
       tempo: 100,
       cycleBeats: 4,
+      countdown: 1,
       layers: [
         { name: "Pulse", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.85, density: 0.5, swing: 0.5 },
         { name: "Phrase", type: "random", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "pip", volume: 0.6, density: 0.5, swing: 0.5, hitsPerCycle: 1, repeatCycles: 1 },

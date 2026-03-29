@@ -43,6 +43,7 @@ export default function App() {
           groups={lab.groups}
           tempo={lab.tempo}
           cycleBeats={lab.cycleBeats}
+          countdown={lab.countdown}
           onLoadTemplate={lab.loadTemplate}
         />
       </TransportBar>

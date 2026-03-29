@@ -73,6 +73,8 @@ export interface SavedTemplate {
   cycleBeats: number;
   layers: SavedTemplateLayer[];
   groups?: SavedTemplateGroup[];
+  /** Count-in cycles before playback (0 | 0.5 | 1 | 2). Omit or 0 = off. */
+  countdown?: 0 | 0.5 | 1 | 2;
   savedAt: number;
 }
 
@@ -192,11 +194,13 @@ export function saveTemplate(
   cycleBeats: number,
   overwriteId?: string,
   groups?: SavedTemplateGroup[],
+  countdown?: 0 | 0.5 | 1 | 2,
 ): SavedTemplate {
   const templateData: Omit<SavedTemplate, "id" | "savedAt"> = {
     name,
     tempo,
     cycleBeats,
+    ...(countdown ? { countdown } : {}),
     layers: layers.map((l) => ({
       name: l.name,
       type: l.type,

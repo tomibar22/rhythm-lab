@@ -14,6 +14,7 @@ interface TemplateBrowserProps {
   groups: LayerGroup[];
   tempo: number;
   cycleBeats: number;
+  countdown: 0 | 0.5 | 1 | 2;
   onLoadTemplate: (template: SavedTemplate) => void;
 }
 
@@ -22,6 +23,7 @@ export function TemplateBrowser({
   groups,
   tempo,
   cycleBeats,
+  countdown,
   onLoadTemplate,
 }: TemplateBrowserProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,7 +57,7 @@ export function TemplateBrowser({
     const savedGroups = groups.length > 0
       ? groups.map((g) => ({ id: g.id, name: g.name, volume: g.volume, ...(g.cyclePattern.length > 1 ? { cyclePattern: [...g.cyclePattern] } : {}) }))
       : undefined;
-    saveTemplate(name, layers, tempo, cycleBeats, effectiveOverwriteId || undefined, savedGroups);
+    saveTemplate(name, layers, tempo, cycleBeats, effectiveOverwriteId || undefined, savedGroups, countdown);
     setTemplates(getSavedTemplates());
     setSaveName("");
     setShowSave(false);

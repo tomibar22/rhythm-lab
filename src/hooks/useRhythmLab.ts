@@ -928,6 +928,7 @@ export function useRhythmLab() {
     setGroups(newGroups);
     setTempo(template.tempo);
     setCycleBeats(template.cycleBeats);
+    setCountdownRaw(template.countdown ?? 0);
     if (newLayers.length > 0) {
       setSelectedLayerId(newLayers[0].id);
     }
