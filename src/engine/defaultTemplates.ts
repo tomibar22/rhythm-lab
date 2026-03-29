@@ -15,6 +15,17 @@ import { SavedTemplate } from "./storage";
  */
 export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
   {
+    id: "builtin:basic-beat",
+    name: "Basic Beat",
+    tempo: 105,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, swing: 0.5 },
+      { name: "Random", type: "random", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "pip", volume: 0.55, density: 0.3, swing: 0.5 },
+    ],
+    savedAt: 0,
+  },
+  {
     id: "builtin:random-beats",
     name: "Random Beats",
     tempo: 120,

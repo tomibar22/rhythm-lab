@@ -224,12 +224,12 @@ const DEFAULT_LAYERS: Layer[] = [
 ];
 
 /**
- * Try to load "Random 8ths" template from localStorage as default state.
+ * Try to load "Basic Beat" template from localStorage as default state.
  */
 function getInitialState() {
   try {
     const templates = getSavedTemplates();
-    const defaultTemplate = templates.find((t) => t.name === "Random 8ths");
+    const defaultTemplate = templates.find((t) => t.name === "Basic Beat") || templates.find((t) => t.name === "Random 8ths");
     if (defaultTemplate && defaultTemplate.layers.length > 0) {
       const layers = defaultTemplate.layers.map((tl: SavedTemplateLayer, i: number) =>
         createLayer(i, {
