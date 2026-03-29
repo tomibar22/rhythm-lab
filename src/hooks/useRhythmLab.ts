@@ -899,6 +899,7 @@ export function useRhythmLab() {
         density: tl.density,
         cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
         repeatCycles: tl.repeatCycles ?? 0,
+        hitsPerCycle: tl.hitsPerCycle ?? 0,
         swing: tl.swing,
         groupId: tl.groupId,
       }),
