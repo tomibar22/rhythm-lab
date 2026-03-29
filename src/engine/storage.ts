@@ -4,9 +4,48 @@
  */
 
 import { Layer, LayerType, SoundPreset } from "./types";
-import { BUILT_IN_TEMPLATES, isBuiltIn } from "./defaultTemplates";
+import { BUILT_IN_TEMPLATES } from "./defaultTemplates";
 
 const ORDER_KEY = "rhythm-lab:template-order";
+const HYDRATION_KEY = "rhythm-lab:hydrated-ids";
+
+// ─────────────────────────────────────────────
+// HYDRATION — copy built-in templates into localStorage on first load
+// so they become fully editable user templates.
+// ─────────────────────────────────────────────
+
+/** Ensure all built-in templates exist in user storage (runs once per new built-in). */
+function hydrateBuiltIns(): void {
+  let hydratedIds: string[];
+  try {
+    hydratedIds = JSON.parse(localStorage.getItem(HYDRATION_KEY) || "[]");
+  } catch {
+    hydratedIds = [];
+  }
+  const hydratedSet = new Set(hydratedIds);
+  const newTemplates = BUILT_IN_TEMPLATES.filter((t) => !hydratedSet.has(t.id));
+  if (newTemplates.length === 0) return;
+
+  const userTemplates = getUserTemplatesRaw();
+  const existingIds = new Set(userTemplates.map((t) => t.id));
+  for (const t of newTemplates) {
+    if (!existingIds.has(t.id)) {
+      userTemplates.push({ ...t, savedAt: Date.now() });
+    }
+    hydratedSet.add(t.id);
+  }
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(userTemplates));
+  localStorage.setItem(HYDRATION_KEY, JSON.stringify([...hydratedSet]));
+}
+
+/** Raw read — no hydration guard (used by hydrateBuiltIns itself). */
+function getUserTemplatesRaw(): SavedTemplate[] {
+  try {
+    return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -115,13 +154,10 @@ export function deletePattern(id: string): void {
 // TEMPLATES (full composition)
 // ─────────────────────────────────────────────
 
-/** Get user-saved templates from localStorage only (no built-ins) */
+/** Get user templates from localStorage (includes hydrated built-ins). */
 function getUserTemplates(): SavedTemplate[] {
-  try {
-    return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  hydrateBuiltIns();
+  return getUserTemplatesRaw();
 }
 
 /** Get saved custom order (array of template IDs), or null if none */
@@ -134,9 +170,9 @@ function getTemplateOrder(): string[] | null {
   }
 }
 
-/** Get all templates: respects custom order if set, else built-in first then user */
+/** Get all templates (all live in localStorage now, built-ins are hydrated on first load). */
 export function getSavedTemplates(): SavedTemplate[] {
-  const all = [...BUILT_IN_TEMPLATES, ...getUserTemplates()];
+  const all = getUserTemplates();
   const order = getTemplateOrder();
   if (!order) return all;
 
@@ -180,8 +216,8 @@ export function saveTemplate(
 
   const userTemplates = getUserTemplates();
 
-  if (overwriteId && !isBuiltIn(overwriteId)) {
-    // Overwrite existing user template in-place (preserve position)
+  if (overwriteId) {
+    // Overwrite existing template in-place (preserve position)
     const idx = userTemplates.findIndex((t) => t.id === overwriteId);
     if (idx !== -1) {
       const updated: SavedTemplate = {
@@ -215,7 +251,6 @@ export function saveTemplate(
 }
 
 export function renameTemplate(id: string, newName: string): void {
-  if (isBuiltIn(id)) return; // Cannot rename built-in templates
   const templates = getUserTemplates();
   const idx = templates.findIndex((t) => t.id === id);
   if (idx !== -1) {
@@ -225,7 +260,6 @@ export function renameTemplate(id: string, newName: string): void {
 }
 
 export function deleteTemplate(id: string): void {
-  if (isBuiltIn(id)) return; // Cannot delete built-in templates
   const templates = getUserTemplates().filter((t) => t.id !== id);
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
   // Remove from custom order if present
@@ -246,5 +280,3 @@ export function reorderTemplates(fromIndex: number, toIndex: number): void {
   localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
 }
 
-/** Re-export for use in UI to show/hide delete/rename buttons */
-export { isBuiltIn } from "./defaultTemplates";

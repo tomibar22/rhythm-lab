@@ -191,8 +191,7 @@ export function isBuiltIn(templateId: string): boolean {
 export function exportTemplatesForBundling(): string {
   try {
     const userRaw = localStorage.getItem("rhythm-lab:templates");
-    const userTemplates: SavedTemplate[] = userRaw ? JSON.parse(userRaw) : [];
-    const all = [...BUILT_IN_TEMPLATES, ...userTemplates];
+    const all: SavedTemplate[] = userRaw ? JSON.parse(userRaw) : [];
 
     // Apply custom order if set
     const orderRaw = localStorage.getItem("rhythm-lab:template-order");
