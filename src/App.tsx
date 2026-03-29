@@ -18,18 +18,28 @@ export default function App() {
         lab.togglePlay();
       }
     };
-    // Blur buttons/selects after mouse click to prevent sticky focus rings
+    // Blur buttons after mouse click to prevent sticky focus rings.
+    // Selects are excluded — blurring them closes the dropdown.
     const handleMouseUp = (e: MouseEvent) => {
       const el = e.target as HTMLElement;
-      if (el instanceof HTMLButtonElement || el instanceof HTMLSelectElement) {
+      if (el instanceof HTMLButtonElement) {
+        el.blur();
+      }
+    };
+    // Blur selects after a choice is made (or dropdown dismissed)
+    const handleSelectBlur = (e: Event) => {
+      const el = e.target as HTMLElement;
+      if (el instanceof HTMLSelectElement) {
         el.blur();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("change", handleSelectBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("change", handleSelectBlur);
     };
   }, [lab.togglePlay]);
 
