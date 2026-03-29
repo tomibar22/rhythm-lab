@@ -2029,3 +2029,50 @@ body {
     padding: 3px 6px;
   }
 }
+
+
+/* ─────────────────────────────────────────────
+   COUNTDOWN OVERLAY
+   ───────────────────────────────────────────── */
+
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 22, 0.75);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: countdown-fade-in 0.15s ease-out;
+}
+
+.countdown-number {
+  font-family: var(--font-sans);
+  font-size: clamp(6rem, 20vw, 12rem);
+  font-weight: 300;
+  color: var(--text-muted);
+  line-height: 1;
+  animation: countdown-pulse 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.countdown-number.accent {
+  color: var(--text-secondary);
+}
+
+@keyframes countdown-pulse {
+  0% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+}
+
+@keyframes countdown-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -291,6 +291,8 @@ export function useRhythmLab() {
   // Auto-fallback: if ½ is selected but cycle is now odd, treat as off
   const countdown = (countdownRaw === 0.5 && cycleBeats % 2 !== 0) ? 0 : countdownRaw;
   const setCountdown = setCountdownRaw;
+  /** Current countdown beat info, or null when not counting in. */
+  const [countdownBeat, setCountdownBeat] = useState<{ beat: number; totalBeats: number; isBarStart: boolean } | null>(null);
 
   const engineRef = useRef<AudioEngine | null>(null);
 
@@ -483,6 +485,7 @@ export function useRhythmLab() {
         engine.stop();
         setIsPlaying(false);
         setActiveSteps({});
+        setCountdownBeat(null);
       } else {
         await engine.init();
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
@@ -496,7 +499,14 @@ export function useRhythmLab() {
         );
         // Schedule countdown AFTER scheduleLayers (which clears all parts)
         if (cd > 0) {
-          engine.scheduleCountdown(cycleBeatsRef.current, cd);
+          engine.scheduleCountdown(cycleBeatsRef.current, cd, (info) => {
+            setCountdownBeat(info);
+            // Clear overlay after the last beat (at the next beat's duration)
+            if (info.beat === info.totalBeats) {
+              const beatMs = 60_000 / tempoRef.current;
+              setTimeout(() => setCountdownBeat(null), beatMs * 0.8);
+            }
+          });
         }
         engine.play(tempoRef.current);
         justStartedRef.current = true;
@@ -939,6 +949,7 @@ export function useRhythmLab() {
     pendingCycleChange,
     countdown,
     setCountdown,
+    countdownBeat,
 
     // Groups
     groups,

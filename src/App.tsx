@@ -5,6 +5,7 @@ import { GridEditor } from "./components/GridEditor";
 import { CircleView } from "./components/CircleView";
 import { PatternBrowser } from "./components/PatternBrowser";
 import { TemplateBrowser } from "./components/TemplateBrowser";
+import { CountdownOverlay } from "./components/CountdownOverlay";
 
 export default function App() {
   const lab = useRhythmLab();
@@ -24,6 +25,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <CountdownOverlay countdownBeat={lab.countdownBeat} cycleBeats={lab.cycleBeats} />
       <TransportBar
         isPlaying={lab.isPlaying}
         tempo={lab.tempo}

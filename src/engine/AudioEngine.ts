@@ -530,8 +530,15 @@ export class AudioEngine {
   /**
    * Schedule countdown pip clicks before layer playback begins.
    * Non-looping — plays once then the layers take over.
+   * @param onBeat Called on the main thread for each countdown beat with
+   *   `{ beat, totalBeats, isBarStart }` — used for the visual overlay.
+   *   Beat is 1-indexed (1 = first beat).
    */
-  scheduleCountdown(cycleBeats: number, countdownBars: number): void {
+  scheduleCountdown(
+    cycleBeats: number,
+    countdownBars: number,
+    onBeat?: (info: { beat: number; totalBeats: number; isBarStart: boolean }) => void,
+  ): void {
     const spec = this.getSpec("ping");
     const synth = this.getOrCreateSynth("__countdown__", "ping");
     const totalBeats = countdownBars * cycleBeats;
@@ -541,12 +548,18 @@ export class AudioEngine {
     for (let i = 0; i < totalBeats; i++) {
       // First beat of each bar gets a slightly louder accent
       const isBarStart = i % cycleBeats === 0;
-      events.push({ time: `${i * APP_PPQ}i`, vol: isBarStart ? 0.7 : 0.4 });
+      events.push({ time: `${i * APP_PPQ}i`, vol: isBarStart ? 0.7 : 0.4, beat: i + 1, isBarStart });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const part = new Tone.Part((time: number, event: any) => {
       this.triggerSynth(synth, spec, time, event.vol);
+      if (onBeat) {
+        // Fire on main thread so React can update
+        Tone.getDraw().schedule(() => {
+          onBeat({ beat: event.beat, totalBeats, isBarStart: event.isBarStart });
+        }, time);
+      }
     }, events);
 
     part.loop = false;
