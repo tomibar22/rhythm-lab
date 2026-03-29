@@ -18,8 +18,19 @@ export default function App() {
         lab.togglePlay();
       }
     };
+    // Blur buttons/selects after mouse click to prevent sticky focus rings
+    const handleMouseUp = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (el instanceof HTMLButtonElement || el instanceof HTMLSelectElement) {
+        el.blur();
+      }
+    };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
   }, [lab.togglePlay]);
 
   const selectedLayer = lab.layers.find((l) => l.id === lab.selectedLayerId);
