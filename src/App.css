@@ -468,6 +468,11 @@ body {
   cursor: pointer;
 }
 
+.layer-sound:focus {
+  outline: none;
+  border-color: var(--border);
+}
+
 /* Step grid */
 .step-grid {
   display: flex;

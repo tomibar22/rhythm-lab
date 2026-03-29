@@ -18,50 +18,18 @@ export default function App() {
         lab.togglePlay();
       }
     };
-    // Blur buttons and selects after mouse interaction to prevent
-    // sticky focus rings. Selects need special handling: we can't blur
-    // on the first mousedown/up or the dropdown won't open. Instead we
-    // track whether a select was already focused before the click.
-    let selectWasFocused: HTMLSelectElement | null = null;
-    const handleMouseDown = (e: MouseEvent) => {
-      // If a select already has focus when we click, mark it for blur
-      if (e.target instanceof HTMLSelectElement && document.activeElement === e.target) {
-        selectWasFocused = e.target;
-      } else {
-        selectWasFocused = null;
-      }
-    };
+    // Blur buttons after mouse click to prevent sticky focus rings.
+    // Selects are handled via CSS only — JS blur fights native dropdown behavior.
     const handleMouseUp = (e: MouseEvent) => {
-      const el = e.target as HTMLElement;
-      if (el instanceof HTMLButtonElement) {
-        el.blur();
-      }
-      // Blur a select that was already focused (dropdown was open → now closed)
-      if (selectWasFocused) {
-        selectWasFocused.blur();
-        selectWasFocused = null;
-      }
-      // Blur any focused select when clicking elsewhere
-      const active = document.activeElement;
-      if (active instanceof HTMLSelectElement && active !== el) {
-        active.blur();
-      }
-    };
-    const handleSelectChange = (e: Event) => {
-      if (e.target instanceof HTMLSelectElement) {
+      if (e.target instanceof HTMLButtonElement) {
         e.target.blur();
-        selectWasFocused = null;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("mousedown", handleMouseDown);
     window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("change", handleSelectChange);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("mousedown", handleMouseDown);
       window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("change", handleSelectChange);
     };
   }, [lab.togglePlay]);
 
