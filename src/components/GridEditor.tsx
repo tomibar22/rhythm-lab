@@ -197,7 +197,13 @@ export function GridEditor({
       // appears inside the group (last layer's drop-below); when null, it
       // appears outside (group container's drop-below = ungroup).
       const applySlot = (slot: number, inGroupId: string | null = null) => {
-        if (dragRange && slot >= dragRange[0] && slot <= dragRange[1]) {
+        // Self-drop guard: skip if dropping on own row range — UNLESS the
+        // target group is different from the source (that's a valid move-into-group,
+        // not a self-drop, even though the slot index happens to coincide).
+        const draggedLayer = isDraggingLayer ? layersRef.current.find(l => l.id === drag.id) : null;
+        const isSelfDrop = dragRange && slot >= dragRange[0] && slot <= dragRange[1];
+        const isCrossGroup = draggedLayer && inGroupId && (draggedLayer.groupId ?? null) !== inGroupId;
+        if (isSelfDrop && !isCrossGroup) {
           drag.dropTarget = null;
           setIndicatorSlot(null);
           setIndicatorInGroupId(null);
