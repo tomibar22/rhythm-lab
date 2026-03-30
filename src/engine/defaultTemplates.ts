@@ -183,6 +183,30 @@ export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
     ],
     savedAt: 0,
   },
+  {
+    id: "builtin:x2-x3-x4",
+    name: "x2, x3, x4",
+    tempo: 105,
+    cycleBeats: 4,
+    layers: [
+      { name: "Kick", type: "manual", steps: 4, pattern: [1, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, swing: 0.5, cyclePattern: [1] },
+      { name: "Random", type: "random", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "pip", volume: 0.55, density: 0.4, swing: 0.5, cyclePattern: [1, 1, 0, 0, 0, 0], repeatCycles: 1 },
+      { name: "Random 3", type: "random", steps: 12, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "tap", volume: 0.55, density: 0.4, swing: 0.5, cyclePattern: [0, 0, 1, 1, 0, 0], repeatCycles: 1 },
+      { name: "Random 4", type: "random", steps: 16, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "tick", volume: 0.55, density: 0.4, swing: 0.5, cyclePattern: [0, 0, 0, 0, 1, 1], repeatCycles: 1 },
+    ],
+    savedAt: 0,
+  },
+  {
+    id: "builtin:7-beats-gap",
+    name: "7 beats gap",
+    tempo: 170,
+    cycleBeats: 7,
+    layers: [
+      { name: "Kick", type: "manual", steps: 7, pattern: [1, 0, 0, 0, 0, 0, 0], sound: "kick", volume: 0.85, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 1, 0, 0, 0] },
+      { name: "Layer 3", type: "manual", steps: 7, pattern: [1, 0, 1, 0, 1, 0, 0], sound: "ping", volume: 0.7, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 0, 0, 0, 0] },
+    ],
+    savedAt: 0,
+  },
 ];
 
 /** Check if a template is built-in (cannot be deleted/renamed by users) */
