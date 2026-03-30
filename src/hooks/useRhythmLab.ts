@@ -168,9 +168,10 @@ function pickUnusedSound(existingLayers: Layer[]): SoundPreset {
 function createLayer(
   index: number,
   overrides?: Partial<Layer>,
+  cycleBeats = 4,
 ): Layer {
   const type = overrides?.type ?? "manual";
-  const steps = overrides?.steps ?? 8;
+  const steps = overrides?.steps ?? cycleBeats * 2;
   const density = overrides?.density ?? 0.5;
   // Random layers: pattern = allowed mask (1 = can fire, 0 = forbidden)
   // Manual layers: pattern = onset pattern (1 = on, 0 = off)
@@ -539,7 +540,7 @@ export function useRhythmLab() {
 
   const addLayer = useCallback((type: LayerType = "manual") => {
     setLayers((prev) => {
-      const newLayer = createLayer(prev.length, { type, sound: pickUnusedSound(prev) });
+      const newLayer = createLayer(prev.length, { type, sound: pickUnusedSound(prev) }, cycleBeatsRef.current);
       return [...prev, newLayer];
     });
   }, []);
@@ -817,7 +818,7 @@ export function useRhythmLab() {
 
   const addLayerToGroup = useCallback((groupId: string, type: LayerType = "manual") => {
     setLayers((prev) => {
-      const newLayer = createLayer(prev.length, { type, groupId, sound: pickUnusedSound(prev) });
+      const newLayer = createLayer(prev.length, { type, groupId, sound: pickUnusedSound(prev) }, cycleBeatsRef.current);
       // Insert after last layer of the group (or append if group has no layers yet)
       const lastIdx = prev.reduce((acc, l, i) => l.groupId === groupId ? i : acc, -1);
       if (lastIdx === -1) return [...prev, newLayer];
