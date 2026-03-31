@@ -1017,7 +1017,8 @@ function LayerRow({
     [layer.volume, onUpdateLayer],
   );
 
-  const activeMultiplier = STEP_MULTIPLIERS.find((m) => m * cycleBeats === layer.steps);
+  const effectiveCycleBeats = layer.ownCycleBeats ?? cycleBeats;
+  const activeMultiplier = STEP_MULTIPLIERS.find((m) => m * effectiveCycleBeats === layer.steps);
 
   return (
     <div
@@ -1163,7 +1164,7 @@ function LayerRow({
         </div>
         <div className="step-multipliers">
           {STEP_MULTIPLIERS.map((m) => {
-            const targetSteps = m * cycleBeats;
+            const targetSteps = m * effectiveCycleBeats;
             if (targetSteps > MAX_STEPS) return null;
             return (
               <button
@@ -1174,6 +1175,43 @@ function LayerRow({
               >×{m}</button>
             );
           })}
+        </div>
+
+        {/* Polymeter: own cycle beats control */}
+        <div className="polymeter-control" onClick={(e) => e.stopPropagation()}>
+          {layer.ownCycleBeats ? (
+            <>
+              <span className="polymeter-label" title="This layer has its own cycle length (polymeter)">⟳</span>
+              <button
+                className="polymeter-btn"
+                onClick={() => {
+                  const newVal = layer.ownCycleBeats! - 1;
+                  if (newVal >= 1) onUpdateLayer({ ownCycleBeats: newVal });
+                }}
+                disabled={layer.ownCycleBeats <= 1}
+              >−</button>
+              <span className="polymeter-value">{layer.ownCycleBeats}</span>
+              <button
+                className="polymeter-btn"
+                onClick={() => onUpdateLayer({ ownCycleBeats: layer.ownCycleBeats! + 1 })}
+              >+</button>
+              <button
+                className="polymeter-clear"
+                onClick={() => onUpdateLayer({ ownCycleBeats: undefined })}
+                title="Use global cycle"
+              >×</button>
+            </>
+          ) : (
+            <button
+              className="polymeter-toggle"
+              onClick={() => {
+                // Default to a different cycle than global for immediate effect
+                const defaultOwn = cycleBeats === 4 ? 5 : cycleBeats + 1;
+                onUpdateLayer({ ownCycleBeats: defaultOwn });
+              }}
+              title="Enable polymeter — give this layer its own cycle length"
+            >⟳</button>
+          )}
         </div>
 
         {isRandom && (
@@ -1314,7 +1352,7 @@ function LayerRow({
         onPointerMove={handleGridPointerMove}
       >
         {(() => {
-          const stepsPerBeat = layer.steps / cycleBeats;
+          const stepsPerBeat = layer.steps / effectiveCycleBeats;
           const groupSize =
             Number.isInteger(stepsPerBeat) && stepsPerBeat > 0
               ? stepsPerBeat

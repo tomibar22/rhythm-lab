@@ -42,6 +42,8 @@ export interface Layer {
   cyclePattern: (0 | 1)[];
   /** Random layers only: repeat the same random result for N extra play-cycles before regenerating. 0 = pure random. */
   repeatCycles: number;
+  /** Optional independent cycle length in beats. When set, layer loops on its own cycle instead of the global one (polymeter). */
+  ownCycleBeats?: number;
   /** Optional group this layer belongs to */
   groupId?: string;
 }

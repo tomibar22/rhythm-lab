@@ -314,7 +314,6 @@ export class AudioEngine {
     this._effectiveCycleBeats = cycleBeats;
     this.startBoundarySentinel(cycleBeats, alignTick);
 
-    const cycleTicks = cycleBeats * APP_PPQ;
     const hasSolo = layers.some((l) => l.solo);
     const transport = Tone.getTransport();
     const isMidPlayback = transport.state === "started" && transport.ticks > alignTick;
@@ -323,18 +322,19 @@ export class AudioEngine {
       if (layer.muted) continue;
       if (hasSolo && !layer.solo) continue;
 
+      // Polymetric layers use their own cycle length
+      const layerCycleTicks = (layer.ownCycleBeats ?? cycleBeats) * APP_PPQ;
+
       if (layer.type === "random") {
         if (isMidPlayback) {
-          // Mid-playback: compute correct counter so random layers stay
-          // in sync with the cycle position instead of resetting to step 0.
           const { startTick, initialCounter } =
-            this.computeRandomLayerSync(layer, cycleTicks, alignTick);
-          this.scheduleRandomLayer(layer, cycleTicks, onStep, startTick, initialCounter);
+            this.computeRandomLayerSync(layer, layerCycleTicks, alignTick);
+          this.scheduleRandomLayer(layer, layerCycleTicks, onStep, startTick, initialCounter);
         } else {
-          this.scheduleRandomLayer(layer, cycleTicks, onStep, alignTick);
+          this.scheduleRandomLayer(layer, layerCycleTicks, onStep, alignTick);
         }
       } else {
-        this.scheduleManualLayer(layer, cycleTicks, onStep, alignTick);
+        this.scheduleManualLayer(layer, layerCycleTicks, onStep, alignTick);
       }
     }
   }
@@ -350,7 +350,8 @@ export class AudioEngine {
   ): void {
     this.clearLayerParts(layer.id);
 
-    const cycleTicks = cycleBeats * APP_PPQ;
+    // Polymetric layers use their own cycle length
+    const cycleTicks = (layer.ownCycleBeats ?? cycleBeats) * APP_PPQ;
 
     if (layer.type === "random") {
       const { startTick, initialCounter } =

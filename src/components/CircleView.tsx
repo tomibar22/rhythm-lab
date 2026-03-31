@@ -15,6 +15,9 @@ interface CircleViewProps {
  * Circular necklace visualization of rhythmic patterns.
  * Each layer is rendered as a concentric ring with dots at step positions.
  * Filled dots = onsets. A rotating needle shows playback position.
+ *
+ * Polymetric layers (with ownCycleBeats) get a traveling dot on their ring
+ * that rotates at their own speed, independent of the global needle.
  */
 export function CircleView({
   layers,
@@ -55,15 +58,20 @@ export function CircleView({
     const ringWidth = maxRadius / (visibleLayers.length + 1);
     const minRadius = ringWidth * 1.2;
 
+    const engine = getEngine();
+
     // Draw each layer as a concentric ring
     visibleLayers.forEach((layer, layerIndex) => {
       const radius = minRadius + layerIndex * ringWidth;
       const dotRadius = Math.max(4, Math.min(8, ringWidth * 0.2));
+      const isPolymetric = !!layer.ownCycleBeats;
 
-      // Draw ring outline
+      // Draw ring outline — slightly brighter for polymetric layers
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.strokeStyle = isPolymetric
+        ? "rgba(255,255,255,0.14)"
+        : "rgba(255,255,255,0.08)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -193,13 +201,36 @@ export function CircleView({
           ctx.fillText(String(ioi), lx, ly);
         });
       }
+
+      // Polymetric traveling dot — shows this layer's own playback position
+      if (isPlaying && isPolymetric) {
+        const layerProgress = engine.getProgress(layer.ownCycleBeats);
+        const dotAngle = layerProgress * Math.PI * 2 - Math.PI / 2;
+        const dx = cx + Math.cos(dotAngle) * radius;
+        const dy = cy + Math.sin(dotAngle) * radius;
+        const travDotSize = dotRadius * 1.8;
+
+        // Glow
+        ctx.beginPath();
+        ctx.arc(dx, dy, travDotSize, 0, Math.PI * 2);
+        ctx.shadowColor = layer.color;
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = layer.color;
+        ctx.globalAlpha = 0.6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(dx, dy, travDotSize * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
     });
 
-    // Draw playback needle
+    // Draw global playback needle
     if (isPlaying) {
-      // Use engine's effective cycle beats (not UI value) so the needle
-      // stays in sync during deferred cycle-length changes.
-      const engine = getEngine();
       const progress = engine.getProgress(engine.effectiveCycleBeats);
       const needleAngle = progress * Math.PI * 2 - Math.PI / 2;
       const needleLength = maxRadius + 5;
