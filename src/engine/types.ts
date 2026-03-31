@@ -42,8 +42,14 @@ export interface Layer {
   cyclePattern: (0 | 1)[];
   /** Random layers only: repeat the same random result for N extra play-cycles before regenerating. 0 = pure random. */
   repeatCycles: number;
-  /** Optional independent cycle length in beats. When set, layer loops on its own cycle instead of the global one (polymeter). */
-  ownCycleBeats?: number;
+  /**
+   * Polymeter mode: when true, the layer loops independently.
+   * `steps` becomes the pattern length, and `subdivision` sets the step rate.
+   * Loop duration = steps × (PPQ / subdivision) ticks.
+   */
+  polymetric?: boolean;
+  /** Step rate for polymetric layers: 1=quarter, 2=8th, 3=triplet, 4=16th, 6=sextuplet, 8=32nd. Only used when polymetric=true. */
+  subdivision?: number;
   /** Optional group this layer belongs to */
   groupId?: string;
 }

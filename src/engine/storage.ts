@@ -98,8 +98,10 @@ export interface SavedTemplateLayer {
   repeatCycles?: number;
   /** Exact hits per cycle. 0 = density mode. */
   hitsPerCycle?: number;
-  /** Independent cycle length in beats (polymeter). Omit = use global. */
-  ownCycleBeats?: number;
+  /** Polymeter mode: layer loops independently at its own rate. */
+  polymetric?: boolean;
+  /** Step rate for polymetric layers (1,2,3,4,6,8). */
+  subdivision?: number;
 }
 
 export interface SavedTemplateGroup {
@@ -215,7 +217,7 @@ export function saveTemplate(
       cyclePattern: [...l.cyclePattern],
       ...(l.repeatCycles > 0 ? { repeatCycles: l.repeatCycles } : {}),
       ...(l.hitsPerCycle > 0 ? { hitsPerCycle: l.hitsPerCycle } : {}),
-      ...(l.ownCycleBeats ? { ownCycleBeats: l.ownCycleBeats } : {}),
+      ...(l.polymetric ? { polymetric: true, subdivision: l.subdivision } : {}),
       ...(l.groupId ? { groupId: l.groupId } : {}),
     })),
     ...(groups && groups.length > 0 ? { groups } : {}),

@@ -1017,8 +1017,12 @@ function LayerRow({
     [layer.volume, onUpdateLayer],
   );
 
-  const effectiveCycleBeats = layer.ownCycleBeats ?? cycleBeats;
-  const activeMultiplier = STEP_MULTIPLIERS.find((m) => m * effectiveCycleBeats === layer.steps);
+  const isPolymetric = !!layer.polymetric;
+  // In polymetric mode, subdivision is stored explicitly; multiplier pills set it.
+  // In normal mode, multiplier is derived from steps / cycleBeats.
+  const activeMultiplier = isPolymetric
+    ? (layer.subdivision && STEP_MULTIPLIERS.includes(layer.subdivision as typeof STEP_MULTIPLIERS[number]) ? layer.subdivision : undefined)
+    : STEP_MULTIPLIERS.find((m) => m * cycleBeats === layer.steps);
 
   return (
     <div
@@ -1164,7 +1168,18 @@ function LayerRow({
         </div>
         <div className="step-multipliers">
           {STEP_MULTIPLIERS.map((m) => {
-            const targetSteps = m * effectiveCycleBeats;
+            if (isPolymetric) {
+              // Polymetric mode: pills set subdivision (step rate), not step count
+              return (
+                <button
+                  key={m}
+                  className={`step-mult-btn ${activeMultiplier === m ? "active" : ""}`}
+                  onClick={() => onUpdateLayer({ subdivision: m })}
+                  title={`×${m} subdivision (${m} steps per beat)`}
+                >×{m}</button>
+              );
+            }
+            const targetSteps = m * cycleBeats;
             if (targetSteps > MAX_STEPS) return null;
             return (
               <button
@@ -1177,39 +1192,23 @@ function LayerRow({
           })}
         </div>
 
-        {/* Polymeter: own cycle beats control */}
+        {/* Polymeter toggle */}
         <div className="polymeter-control" onClick={(e) => e.stopPropagation()}>
-          {layer.ownCycleBeats ? (
-            <>
-              <span className="polymeter-label" title="This layer has its own cycle length (polymeter)">⟳</span>
-              <button
-                className="polymeter-btn"
-                onClick={() => {
-                  const newVal = layer.ownCycleBeats! - 1;
-                  if (newVal >= 1) onUpdateLayer({ ownCycleBeats: newVal });
-                }}
-                disabled={layer.ownCycleBeats <= 1}
-              >−</button>
-              <span className="polymeter-value">{layer.ownCycleBeats}</span>
-              <button
-                className="polymeter-btn"
-                onClick={() => onUpdateLayer({ ownCycleBeats: layer.ownCycleBeats! + 1 })}
-              >+</button>
-              <button
-                className="polymeter-clear"
-                onClick={() => onUpdateLayer({ ownCycleBeats: undefined })}
-                title="Use global cycle"
-              >×</button>
-            </>
+          {isPolymetric ? (
+            <button
+              className="polymeter-toggle active"
+              onClick={() => onUpdateLayer({ polymetric: undefined, subdivision: undefined })}
+              title="Disable polymeter — return to global cycle"
+            >⟳</button>
           ) : (
             <button
               className="polymeter-toggle"
               onClick={() => {
-                // Default to a different cycle than global for immediate effect
-                const defaultOwn = cycleBeats === 4 ? 5 : cycleBeats + 1;
-                onUpdateLayer({ ownCycleBeats: defaultOwn });
+                // Enable: store the current multiplier as subdivision, keep steps as-is
+                const currentMult = STEP_MULTIPLIERS.find((m) => m * cycleBeats === layer.steps) ?? 2;
+                onUpdateLayer({ polymetric: true, subdivision: currentMult });
               }}
-              title="Enable polymeter — give this layer its own cycle length"
+              title="Enable polymeter — this pattern loops independently"
             >⟳</button>
           )}
         </div>
@@ -1352,7 +1351,7 @@ function LayerRow({
         onPointerMove={handleGridPointerMove}
       >
         {(() => {
-          const stepsPerBeat = layer.steps / effectiveCycleBeats;
+          const stepsPerBeat = layer.steps / cycleBeats;
           const groupSize =
             Number.isInteger(stepsPerBeat) && stepsPerBeat > 0
               ? stepsPerBeat

@@ -16,8 +16,8 @@ interface CircleViewProps {
  * Each layer is rendered as a concentric ring with dots at step positions.
  * Filled dots = onsets. A rotating needle shows playback position.
  *
- * Polymetric layers (with ownCycleBeats) get a traveling dot on their ring
- * that rotates at their own speed, independent of the global needle.
+ * Polymetric layers get a traveling dot on their ring that rotates at
+ * their own speed, independent of the global needle.
  */
 export function CircleView({
   layers,
@@ -64,7 +64,7 @@ export function CircleView({
     visibleLayers.forEach((layer, layerIndex) => {
       const radius = minRadius + layerIndex * ringWidth;
       const dotRadius = Math.max(4, Math.min(8, ringWidth * 0.2));
-      const isPolymetric = !!layer.ownCycleBeats;
+      const isPolymetric = !!layer.polymetric;
 
       // Draw ring outline — slightly brighter for polymetric layers
       ctx.beginPath();
@@ -204,7 +204,10 @@ export function CircleView({
 
       // Polymetric traveling dot — shows this layer's own playback position
       if (isPlaying && isPolymetric) {
-        const layerProgress = engine.getProgress(layer.ownCycleBeats);
+        // cycleTicks = steps × (PPQ / subdivision)
+        const APP_PPQ = 960;
+        const layerCycleTicks = Math.round(layer.steps * APP_PPQ / (layer.subdivision ?? 1));
+        const layerProgress = engine.getProgressByTicks(layerCycleTicks);
         const dotAngle = layerProgress * Math.PI * 2 - Math.PI / 2;
         const dx = cx + Math.cos(dotAngle) * radius;
         const dy = cy + Math.sin(dotAngle) * radius;

@@ -322,8 +322,11 @@ export class AudioEngine {
       if (layer.muted) continue;
       if (hasSolo && !layer.solo) continue;
 
-      // Polymetric layers use their own cycle length
-      const layerCycleTicks = (layer.ownCycleBeats ?? cycleBeats) * APP_PPQ;
+      // Polymetric layers: cycleTicks = steps × (PPQ / subdivision)
+      // Normal layers: cycleTicks = cycleBeats × PPQ
+      const layerCycleTicks = layer.polymetric && layer.subdivision
+        ? Math.round(layer.steps * APP_PPQ / layer.subdivision)
+        : cycleBeats * APP_PPQ;
 
       if (layer.type === "random") {
         if (isMidPlayback) {
@@ -350,8 +353,9 @@ export class AudioEngine {
   ): void {
     this.clearLayerParts(layer.id);
 
-    // Polymetric layers use their own cycle length
-    const cycleTicks = (layer.ownCycleBeats ?? cycleBeats) * APP_PPQ;
+    const cycleTicks = layer.polymetric && layer.subdivision
+      ? Math.round(layer.steps * APP_PPQ / layer.subdivision)
+      : cycleBeats * APP_PPQ;
 
     if (layer.type === "random") {
       const { startTick, initialCounter } =
@@ -610,6 +614,14 @@ export class AudioEngine {
     const beats = cycleBeats ?? this._effectiveCycleBeats;
     const cycleTicks = beats * APP_PPQ;
     // Subtract alignTick offset so progress stays in phase with audio parts
+    const offsetTicks = transport.ticks - this.cycleAlignTick;
+    const currentTicks = ((offsetTicks % cycleTicks) + cycleTicks) % cycleTicks;
+    return currentTicks / cycleTicks;
+  }
+
+  /** Get progress for a polymetric layer (cycle length in ticks, not beats). */
+  getProgressByTicks(cycleTicks: number): number {
+    const transport = Tone.getTransport();
     const offsetTicks = transport.ticks - this.cycleAlignTick;
     const currentTicks = ((offsetTicks % cycleTicks) + cycleTicks) % cycleTicks;
     return currentTicks / cycleTicks;

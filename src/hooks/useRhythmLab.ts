@@ -46,7 +46,7 @@ function adjustLayersForCycleChange(
 ): Layer[] {
   return layers.map((l) => {
     // Polymetric layers have their own cycle — don't adjust when global changes
-    if (l.ownCycleBeats) return l;
+    if (l.polymetric) return l;
     const multiplier = STEP_MULTIPLIERS.find((m) => m * oldBeats === l.steps);
     if (!multiplier) return l;
 
@@ -83,7 +83,8 @@ function layerAudioChanged(a: Layer, b: Layer): boolean {
   if (a.swing !== b.swing) return true;
   if (a.repeatCycles !== b.repeatCycles) return true;
   if (a.hitsPerCycle !== b.hitsPerCycle) return true;
-  if (a.ownCycleBeats !== b.ownCycleBeats) return true;
+  if (a.polymetric !== b.polymetric) return true;
+  if (a.subdivision !== b.subdivision) return true;
   if (a.cyclePattern.length !== b.cyclePattern.length) return true;
   for (let i = 0; i < a.cyclePattern.length; i++) {
     if (a.cyclePattern[i] !== b.cyclePattern[i]) return true;
@@ -200,7 +201,8 @@ function createLayer(
     cyclePattern: overrides?.cyclePattern ?? [1],
     repeatCycles: overrides?.repeatCycles ?? 0,
     hitsPerCycle: overrides?.hitsPerCycle ?? 0,
-    ownCycleBeats: overrides?.ownCycleBeats,
+    polymetric: overrides?.polymetric,
+    subdivision: overrides?.subdivision,
     groupId: overrides?.groupId,
   };
 }
@@ -248,7 +250,8 @@ function getInitialState() {
           cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
           repeatCycles: tl.repeatCycles ?? 0,
           hitsPerCycle: tl.hitsPerCycle ?? 0,
-          ownCycleBeats: tl.ownCycleBeats,
+          polymetric: tl.polymetric,
+          subdivision: tl.subdivision,
           swing: tl.swing,
           groupId: tl.groupId,
         }),
@@ -568,7 +571,8 @@ export function useRhythmLab() {
         cyclePattern: [...source.cyclePattern],
         repeatCycles: source.repeatCycles,
         hitsPerCycle: source.hitsPerCycle,
-        ownCycleBeats: source.ownCycleBeats,
+        polymetric: source.polymetric,
+        subdivision: source.subdivision,
         groupId: source.groupId,
       });
       // Insert right after the source layer
@@ -813,7 +817,8 @@ export function useRhythmLab() {
           cyclePattern: [...l.cyclePattern],
           repeatCycles: l.repeatCycles,
           hitsPerCycle: l.hitsPerCycle,
-          ownCycleBeats: l.ownCycleBeats,
+          polymetric: l.polymetric,
+          subdivision: l.subdivision,
           groupId: newGroupId,
         }),
       );
@@ -918,7 +923,8 @@ export function useRhythmLab() {
         cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
         repeatCycles: tl.repeatCycles ?? 0,
         hitsPerCycle: tl.hitsPerCycle ?? 0,
-        ownCycleBeats: tl.ownCycleBeats,
+        polymetric: tl.polymetric,
+        subdivision: tl.subdivision,
         swing: tl.swing,
         groupId: tl.groupId,
       }),
