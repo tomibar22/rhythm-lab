@@ -1331,6 +1331,14 @@ body {
   border-width: 1.5px;
 }
 
+.gap-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 2px;
+  line-height: 1;
+}
+
 .gap-compact-play.clickable,
 .gap-compact-rest.clickable {
   cursor: pointer;

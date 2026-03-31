@@ -1676,6 +1676,7 @@ function GapControl({
             onClick={() => handleDotClick(i)}
           />
         ))}
+        {total >= 6 && <span className="gap-count">{total}</span>}
       </div>
       <button
         className="gap-btn"
