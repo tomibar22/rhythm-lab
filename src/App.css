@@ -672,6 +672,18 @@ body {
   border-color: rgba(255,255,255,0.15);
 }
 
+.polymeter-toggle.active {
+  background: var(--accent);
+  color: var(--bg-deep);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(123, 108, 240, 0.4);
+}
+
+.polymeter-toggle.active:hover {
+  background: #8b7ef5;
+  border-color: #8b7ef5;
+}
+
 .polymeter-label {
   font-size: 14px;
   color: var(--accent);
