@@ -1168,6 +1168,7 @@ function LayerRow({
         </div>
         <div className="step-multipliers">
           {STEP_MULTIPLIERS.map((m) => {
+            const label = m === 0.5 ? "×½" : `×${m}`;
             if (isPolymetric) {
               // Polymetric mode: pills set subdivision (step rate), not step count
               return (
@@ -1175,19 +1176,19 @@ function LayerRow({
                   key={m}
                   className={`step-mult-btn ${activeMultiplier === m ? "active" : ""}`}
                   onClick={() => onUpdateLayer({ subdivision: m })}
-                  title={`×${m} subdivision (${m} steps per beat)`}
-                >×{m}</button>
+                  title={`${label} subdivision (${m} steps per beat)`}
+                >{label}</button>
               );
             }
             const targetSteps = m * cycleBeats;
-            if (targetSteps > MAX_STEPS) return null;
+            if (targetSteps > MAX_STEPS || !Number.isInteger(targetSteps)) return null;
             return (
               <button
                 key={m}
                 className={`step-mult-btn ${activeMultiplier === m ? "active" : ""}`}
                 onClick={() => onUpdateLayer({ steps: targetSteps })}
                 title={`${targetSteps} steps (${m} per beat)`}
-              >×{m}</button>
+              >{label}</button>
             );
           })}
         </div>

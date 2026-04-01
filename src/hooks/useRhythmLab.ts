@@ -20,7 +20,7 @@ import {
 // ─────────────────────────────────────────────
 
 /** Step multipliers shared with GridEditor. */
-export const STEP_MULTIPLIERS = [1, 2, 3, 4, 6, 8] as const;
+export const STEP_MULTIPLIERS = [0.5, 1, 2, 3, 4, 6, 8] as const;
 const MAX_STEPS = 128;
 
 // ─────────────────────────────────────────────

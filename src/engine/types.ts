@@ -48,7 +48,7 @@ export interface Layer {
    * Loop duration = steps × (PPQ / subdivision) ticks.
    */
   polymetric?: boolean;
-  /** Step rate for polymetric layers: 1=quarter, 2=8th, 3=triplet, 4=16th, 6=sextuplet, 8=32nd. Only used when polymetric=true. */
+  /** Step rate for polymetric layers: 0.5=half, 1=quarter, 2=8th, 3=triplet, 4=16th, 6=sextuplet, 8=32nd. Only used when polymetric=true. */
   subdivision?: number;
   /** Optional group this layer belongs to */
   groupId?: string;
