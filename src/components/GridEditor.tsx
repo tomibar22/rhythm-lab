@@ -1724,7 +1724,7 @@ function GapControl({
         {cyclePattern.map((v, i) => (
           <span
             key={i}
-            className={`gap-dot ${v === 1 ? "play" : "rest"} clickable ${total > 6 ? "small" : ""}`}
+            className={`gap-dot ${v === 1 ? "play" : "rest"} clickable ${total > 8 ? "small" : ""}`}
             onClick={() => handleDotClick(i)}
           />
         ))}

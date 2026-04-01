@@ -464,11 +464,14 @@ export class AudioEngine {
     let cachedHits: boolean[] | null = null;
     let playCycleCount = 0;
 
-    /** Generate exactly N random hits from allowed steps (Fisher-Yates partial shuffle). */
+    /** Generate exactly N random hits. Locked steps always fire and count toward the total. */
     const generateExactHits = (n: number): boolean[] => {
       const result = new Array<boolean>(steps).fill(false);
-      const pool = [...allowedIndices];
-      const count = Math.min(n, pool.length);
+      // Locked steps fire first and count toward the hit budget
+      for (const idx of lockedIndices) result[idx] = true;
+      const remaining = Math.max(0, n - lockedIndices.size);
+      const pool = [...allowedIndices]; // only non-locked allowed steps
+      const count = Math.min(remaining, pool.length);
       for (let i = 0; i < count; i++) {
         const j = i + Math.floor(Math.random() * (pool.length - i));
         [pool[i], pool[j]] = [pool[j], pool[i]];
