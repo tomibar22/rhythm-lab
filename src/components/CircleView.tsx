@@ -89,13 +89,27 @@ export function CircleView({
         const y = cy + Math.sin(angle) * radius;
 
         const isOn = layer.pattern[i] === 1;
+        const isLocked = layer.pattern[i] === 2;
         const isActive = activeSteps[layer.id] === i;
 
         ctx.beginPath();
         ctx.arc(x, y, isActive ? dotRadius * 1.5 : dotRadius, 0, Math.PI * 2);
 
         if (isRandom) {
-          if (isOn) {
+          if (isLocked) {
+            // Locked steps: full opacity, solid — always fires
+            ctx.fillStyle = isActive ? "#fff" : layer.color;
+            ctx.fill();
+            if (isActive) {
+              ctx.shadowColor = layer.color;
+              ctx.shadowBlur = 12;
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+            ctx.strokeStyle = layer.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          } else if (isOn) {
             // Allowed steps: density-based opacity, flash on active
             const alpha = isActive ? 1.0 : layer.density * 0.5 + 0.15;
             ctx.fillStyle = isActive ? "#fff" : layer.color;
@@ -175,7 +189,7 @@ export function CircleView({
 
       // Draw IOI annotations (skip for random layers)
       if (!isRandom && visibleLayers.length <= 4) {
-        const iois = getIOIs(layer.pattern);
+        const iois = getIOIs(layer.pattern as (0 | 1)[]);
         const onsetIndices = layer.pattern
           .map((v, i) => (v === 1 ? i : -1))
           .filter((i) => i >= 0);

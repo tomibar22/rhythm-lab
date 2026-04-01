@@ -20,8 +20,8 @@ export interface Layer {
   type: LayerType;
   /** Number of steps in one cycle */
   steps: number;
-  /** Binary pattern: 1 = onset, 0 = rest */
-  pattern: (0 | 1)[];
+  /** Binary pattern: manual: 1=onset, 0=rest. Random: 0=forbidden, 1=allowed, 2=locked (always fires). */
+  pattern: (0 | 1 | 2)[];
   /** Per-step velocity 0–127 */
   velocities: number[];
   /** Sound preset */

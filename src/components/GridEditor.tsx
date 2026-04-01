@@ -11,7 +11,7 @@ interface GridEditorProps {
   activeSteps: Record<string, number>;
   selectedLayerId: string;
   cycleBeats: number;
-  onSetStep: (layerId: string, step: number, value: 0 | 1) => void;
+  onSetStep: (layerId: string, step: number, value: 0 | 1 | 2) => void;
   onSelectLayer: (layerId: string) => void;
   onUpdateLayer: (layerId: string, updates: Partial<Layer>) => void;
   onToggleMute: (layerId: string) => void;
@@ -687,7 +687,7 @@ interface LayerRowProps {
   dropPos: "above" | "below" | null;
   inGroup: boolean;
   rowIdx: number;
-  onSetStep: (step: number, value: 0 | 1) => void;
+  onSetStep: (step: number, value: 0 | 1 | 2) => void;
   onSelect: () => void;
   onUpdateLayer: (updates: Partial<Layer>) => void;
   onToggleMute: () => void;
@@ -724,18 +724,24 @@ function LayerRow({
   groupGapActive,
 }: LayerRowProps) {
   // ── Step painting state ──
-  const paintModeRef = useRef<0 | 1 | null>(null); // null = not painting
+  const paintModeRef = useRef<0 | 1 | 2 | null>(null); // null = not painting
   const lastPaintedStepRef = useRef<number | null>(null);
 
   const handleStepPointerDown = useCallback((step: number, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const currentValue = layer.pattern[step];
-    const paintValue: 0 | 1 = currentValue === 1 ? 0 : 1;
+    let paintValue: 0 | 1 | 2;
+    if (layer.type === "random") {
+      // Three-state cycle for random layers: allowed(1) → forbidden(0) → locked(2) → allowed(1)
+      paintValue = currentValue === 1 ? 0 : currentValue === 0 ? 2 : 1;
+    } else {
+      paintValue = currentValue === 1 ? 0 : 1;
+    }
     paintModeRef.current = paintValue;
     lastPaintedStepRef.current = step;
     onSetStep(step, paintValue);
-  }, [layer.pattern, onSetStep]);
+  }, [layer.pattern, layer.type, onSetStep]);
 
   const handleGridPointerMove = useCallback((e: React.PointerEvent) => {
     if (paintModeRef.current === null) return;
@@ -1422,7 +1428,7 @@ function StepButton({
   onPointerDown,
 }: {
   step: number;
-  value: 0 | 1;
+  value: 0 | 1 | 2;
   isActive: boolean;
   isDownbeat: boolean;
   color: string;
@@ -1433,27 +1439,35 @@ function StepButton({
   const isOn = value === 1;
 
   if (isRandom) {
-    const isAllowed = isOn;
-    const isForbidden = !isAllowed;
+    const isForbidden = value === 0;
+    const isLocked = value === 2;
     const d = density ?? 0.5;
 
     const style: React.CSSProperties = isForbidden
       ? { opacity: 0.3 }
-      : {
-          backgroundColor: color,
-          opacity: isActive ? 1 : d * 0.6 + 0.1,
-          boxShadow: isActive
-            ? `0 0 12px ${color}, inset 0 1px 1px rgba(255,255,255,0.25)`
-            : undefined,
-        };
+      : isLocked
+        ? {
+            backgroundColor: color,
+            opacity: 1,
+            boxShadow: isActive
+              ? `0 0 12px ${color}, inset 0 1px 1px rgba(255,255,255,0.25)`
+              : `inset 0 1px 1px rgba(255,255,255,0.15)`,
+          }
+        : {
+            backgroundColor: color,
+            opacity: isActive ? 1 : d * 0.6 + 0.1,
+            boxShadow: isActive
+              ? `0 0 12px ${color}, inset 0 1px 1px rgba(255,255,255,0.25)`
+              : undefined,
+          };
 
     return (
       <button
-        className={`step-cell random-step ${isForbidden ? "forbidden" : ""} ${isActive && !isForbidden ? "active" : ""} ${isDownbeat ? "downbeat" : ""}`}
+        className={`step-cell random-step ${isForbidden ? "forbidden" : ""} ${isLocked ? "locked" : ""} ${isActive && !isForbidden ? "active" : ""} ${isDownbeat ? "downbeat" : ""}`}
         style={style}
         data-step={step}
         onPointerDown={(e) => onPointerDown(step, e)}
-        aria-label={`Step ${step + 1}: ${isForbidden ? "forbidden" : `${Math.round(d * 100)}% density`}`}
+        aria-label={`Step ${step + 1}: ${isForbidden ? "forbidden" : isLocked ? "locked" : `${Math.round(d * 100)}% density`}`}
       />
     );
   }

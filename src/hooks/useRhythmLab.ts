@@ -53,9 +53,9 @@ function adjustLayersForCycleChange(
     const newSteps = multiplier * newBeats;
     if (newSteps < 2 || newSteps > MAX_STEPS) return l;
 
-    let newPattern: (0 | 1)[];
+    let newPattern: (0 | 1 | 2)[];
     if (l.type === "random") {
-      newPattern = Array(newSteps).fill(1) as (0 | 1)[];
+      newPattern = Array(newSteps).fill(1) as (0 | 1 | 2)[];
       for (let i = 0; i < Math.min(l.steps, newSteps); i++) {
         newPattern[i] = l.pattern[i];
       }
@@ -182,8 +182,8 @@ function createLayer(
   const pattern =
     overrides?.pattern ??
     (type === "random"
-      ? (Array(steps).fill(1) as (0 | 1)[])
-      : (Array(steps).fill(0) as (0 | 1)[]));
+      ? (Array(steps).fill(1) as (0 | 1 | 2)[])
+      : (Array(steps).fill(0) as (0 | 1 | 2)[]));
   return {
     id: crypto.randomUUID(),
     name: overrides?.name ?? (type === "random" ? `Random ${index + 1}` : `Layer ${index + 1}`),
@@ -613,7 +613,7 @@ export function useRhythmLab() {
             if (updates.pattern === undefined) {
               if (l.type === "random") {
                 // Random layers: resize allowed mask — preserve existing, fill new with 1 (allowed)
-                const newPattern = Array(newSteps).fill(1) as (0 | 1)[];
+                const newPattern = Array(newSteps).fill(1) as (0 | 1 | 2)[];
                 for (let i = 0; i < Math.min(l.steps, newSteps); i++) {
                   newPattern[i] = l.pattern[i];
                 }
@@ -657,7 +657,7 @@ export function useRhythmLab() {
     );
   }, []);
 
-  const setStep = useCallback((layerId: string, step: number, value: 0 | 1) => {
+  const setStep = useCallback((layerId: string, step: number, value: 0 | 1 | 2) => {
     setLayers((prev) =>
       prev.map((l) => {
         if (l.id !== layerId) return l;
@@ -670,7 +670,7 @@ export function useRhythmLab() {
   }, []);
 
   const setLayerPattern = useCallback(
-    (layerId: string, pattern: (0 | 1)[], steps: number) => {
+    (layerId: string, pattern: (0 | 1 | 2)[], steps: number) => {
       updateLayer(layerId, {
         steps,
         pattern,
@@ -702,9 +702,9 @@ export function useRhythmLab() {
         if (l.id !== layerId) return l;
         if (l.type === "random") {
           // For random layers, "clear" = forbid all steps (silence)
-          return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1)[] };
+          return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1 | 2)[] };
         }
-        return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1)[] };
+        return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1 | 2)[] };
       }),
     );
   }, []);
@@ -713,7 +713,7 @@ export function useRhythmLab() {
     setLayers((prev) =>
       prev.map((l) => {
         if (l.id !== layerId || l.type === "random") return l;
-        return { ...l, pattern: Array(l.steps).fill(1) as (0 | 1)[] };
+        return { ...l, pattern: Array(l.steps).fill(1) as (0 | 1 | 2)[] };
       }),
     );
   }, []);
@@ -782,7 +782,7 @@ export function useRhythmLab() {
   const clearGroup = useCallback((groupId: string) => {
     setLayers((prev) => prev.map((l) => {
       if (l.groupId !== groupId) return l;
-      return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1)[] };
+      return { ...l, pattern: Array(l.steps).fill(0) as (0 | 1 | 2)[] };
     }));
   }, []);
 

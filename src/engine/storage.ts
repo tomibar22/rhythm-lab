@@ -56,7 +56,7 @@ export interface SavedPattern {
   name: string;
   type: LayerType;
   steps: number;
-  pattern: (0 | 1)[];
+  pattern: (0 | 1 | 2)[];
   sound: SoundPreset;
   density: number;
   swing: number;
@@ -82,7 +82,7 @@ export interface SavedTemplateLayer {
   name: string;
   type: LayerType;
   steps: number;
-  pattern: (0 | 1)[];
+  pattern: (0 | 1 | 2)[];
   sound: SoundPreset;
   volume: number;
   density: number;

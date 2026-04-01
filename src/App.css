@@ -1276,6 +1276,14 @@ body {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.random-grid .step-cell.random-step.locked {
+  border: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.random-grid .step-cell.random-step.locked:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 /* Drag handle */
 .drag-handle {
   color: var(--text-secondary);
@@ -1405,8 +1413,8 @@ body {
 }
 
 .gap-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -1429,8 +1437,8 @@ body {
 }
 
 .gap-dot.small {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
 }
 
 .gap-dot.small.rest {

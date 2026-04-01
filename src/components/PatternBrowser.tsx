@@ -11,7 +11,7 @@ import {
 interface PatternBrowserProps {
   selectedLayerId: string;
   selectedLayer: Layer;
-  onApplyPattern: (layerId: string, pattern: (0 | 1)[], steps: number) => void;
+  onApplyPattern: (layerId: string, pattern: (0 | 1 | 2)[], steps: number) => void;
   onUpdateLayer: (layerId: string, updates: Partial<Layer>) => void;
 }
 
@@ -296,7 +296,7 @@ function PatternMini({
   pattern,
   color,
 }: {
-  pattern: (0 | 1)[];
+  pattern: (0 | 1 | 2)[];
   color: string;
 }) {
   return (
@@ -304,8 +304,8 @@ function PatternMini({
       {pattern.map((v, i) => (
         <div
           key={i}
-          className={`mini-cell ${v === 1 ? "on" : "off"}`}
-          style={v === 1 ? { backgroundColor: color } : undefined}
+          className={`mini-cell ${v >= 1 ? "on" : "off"}`}
+          style={v >= 1 ? { backgroundColor: color } : undefined}
         />
       ))}
     </div>

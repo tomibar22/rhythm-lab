@@ -380,7 +380,7 @@ export class AudioEngine {
     // Super-cycle = cyclePattern.length cycles
     const superCycleTicks = cycleTicks * cyclePattern.length;
 
-    const accentWeights = computeAccentWeights(layer.pattern, layer.steps, layer.swing);
+    const accentWeights = computeAccentWeights(layer.pattern as (0 | 1)[], layer.steps, layer.swing);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events: Array<Record<string, any>> = [];
@@ -447,12 +447,13 @@ export class AudioEngine {
     const swing = layer.swing;
     const steps = layer.steps;
     const cyclePattern = [...layer.cyclePattern];
-    const allowedMask = [...layer.pattern]; // 1 = allowed, 0 = forbidden
+    const allowedMask = [...layer.pattern]; // 0 = forbidden, 1 = allowed (random), 2 = locked (always fires)
     const totalStepsPerSuper = steps * cyclePattern.length;
     const roundedStepTicks = Math.round(stepTicks);
     const repeatCycles = layer.repeatCycles ?? 0;
     const hitsPerCycle = layer.hitsPerCycle ?? 0;
     const allowedIndices = allowedMask.reduce<number[]>((acc, v, i) => { if (v === 1) acc.push(i); return acc; }, []);
+    const lockedIndices = new Set(allowedMask.reduce<number[]>((acc, v, i) => { if (v === 2) acc.push(i); return acc; }, []));
 
     // Counter-based step tracking: increments exactly once per loop callback.
     // initialCounter allows resuming mid-cycle (e.g., after density change)
@@ -495,14 +496,16 @@ export class AudioEngine {
             cachedHits = null; // per-step random (default behavior)
           } else if (playCycleCount % (1 + repeatCycles) === 0) {
             cachedHits = Array.from({ length: steps }, (_, i) =>
-              allowedMask[i] === 1 && Math.random() < density,
+              allowedMask[i] === 2 || (allowedMask[i] === 1 && Math.random() < density),
             );
           }
           playCycleCount++;
         }
 
         let shouldFire: boolean;
-        if (cachedHits) {
+        if (lockedIndices.has(currentStep)) {
+          shouldFire = true; // locked steps always fire
+        } else if (cachedHits) {
           shouldFire = cachedHits[currentStep];
         } else {
           shouldFire = allowedMask[currentStep] === 1 && Math.random() < density;
