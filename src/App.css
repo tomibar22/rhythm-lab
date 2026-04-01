@@ -684,6 +684,12 @@ body {
   padding: 3px 8px;
 }
 
+.polymeter-icon {
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 .polymeter-label {
   font-size: 14px;
   color: var(--accent);

@@ -1200,7 +1200,7 @@ function LayerRow({
               className="polymeter-toggle active"
               onClick={() => onUpdateLayer({ polymetric: undefined, subdivision: undefined })}
               title="Disable polymeter — return to global cycle"
-            >⟳ POLY</button>
+            ><span className="polymeter-icon">⟳</span> POLY</button>
           ) : (
             <button
               className="polymeter-toggle"
@@ -1210,7 +1210,7 @@ function LayerRow({
                 onUpdateLayer({ polymetric: true, subdivision: currentMult });
               }}
               title="Enable polymeter — this pattern loops independently"
-            >⟳</button>
+            ><span className="polymeter-icon">⟳</span></button>
           )}
         </div>
 
