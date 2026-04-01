@@ -1715,11 +1715,6 @@ function GapControl({
       onClick={(e) => e.stopPropagation()}
       title={tooltip}
     >
-      <button
-        className="gap-btn"
-        onClick={handleMinus}
-        disabled={total <= 1}
-      >−</button>
       <div className="gap-dots">
         {cyclePattern.map((v, i) => (
           <span
@@ -1730,6 +1725,11 @@ function GapControl({
         ))}
         {total >= 6 && <span className="gap-count">{total}</span>}
       </div>
+      <button
+        className="gap-btn"
+        onClick={handleMinus}
+        disabled={total <= 1}
+      >−</button>
       <button
         className="gap-btn"
         onClick={handlePlus}
