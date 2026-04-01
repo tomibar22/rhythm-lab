@@ -1168,7 +1168,7 @@ function LayerRow({
         </div>
         <div className="step-multipliers">
           {STEP_MULTIPLIERS.map((m) => {
-            const label = m === 0.5 ? "×½" : `×${m}`;
+            const label = `×${m}`;
             if (isPolymetric) {
               // Polymetric mode: pills set subdivision (step rate), not step count
               return (
