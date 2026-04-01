@@ -1199,7 +1199,7 @@ function LayerRow({
               className="polymeter-toggle active"
               onClick={() => onUpdateLayer({ polymetric: undefined, subdivision: undefined })}
               title="Disable polymeter — return to global cycle"
-            >⟳</button>
+            >⟳ POLY</button>
           ) : (
             <button
               className="polymeter-toggle"
