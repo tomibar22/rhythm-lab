@@ -139,6 +139,36 @@ export class AudioEngine {
     callback: (boundaryTick: number) => void;
   } | null = null;
 
+  /**
+   * Master bus: all synths route here instead of directly to destination.
+   * Chain: synths → masterGain → compressor → limiter → destination
+   *
+   * - Compressor: gentle glue compression, tames the sum of multiple layers
+   *   without squashing dynamics. Soft knee, low ratio, fast release.
+   * - Limiter: hard ceiling at −1 dB — safety net for transient peaks.
+   */
+  private masterBus: Tone.Channel;
+  private compressor: Tone.Compressor;
+  private limiter: Tone.Limiter;
+
+  constructor() {
+    // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics
+    this.compressor = new Tone.Compressor({
+      threshold: -12,
+      ratio: 3,
+      attack: 0.005,
+      release: 0.08,
+      knee: 10,
+    });
+
+    // Hard limiter: ceiling at −1 dB — prevents any clipping
+    this.limiter = new Tone.Limiter(-1);
+
+    // Master channel: all synths connect here
+    this.masterBus = new Tone.Channel({ volume: 0 });
+    this.masterBus.chain(this.compressor, this.limiter, Tone.getDestination());
+  }
+
   async init(): Promise<void> {
     await Tone.start();
     if (Tone.getContext().state !== "running") {
@@ -167,7 +197,7 @@ export class AudioEngine {
       synth = new Tone.NoiseSynth({
         noise: { type: spec.noiseType ?? "white" },
         envelope: { attack: 0.001, decay: spec.decay, sustain: 0 },
-      }).toDestination();
+      }).connect(this.masterBus);
     } else {
       synth = new Tone.Synth({
         oscillator: { type: spec.oscType },
@@ -177,7 +207,7 @@ export class AudioEngine {
           sustain: 0,
           release: 0.01,
         },
-      }).toDestination();
+      }).connect(this.masterBus);
     }
 
     this.synths.set(key, synth);
@@ -671,5 +701,12 @@ export class AudioEngine {
       }
     }
     this.synths.clear();
+    try {
+      this.masterBus.dispose();
+      this.compressor.dispose();
+      this.limiter.dispose();
+    } catch {
+      // ignore disposal errors
+    }
   }
 }
