@@ -152,11 +152,12 @@ export class AudioEngine {
   private limiter: Tone.Limiter;
 
   constructor() {
-    // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics
+    // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics.
+    // Fast 3ms attack matches the limiter — catches transients within one audio block.
     this.compressor = new Tone.Compressor({
       threshold: -12,
       ratio: 3,
-      attack: 0.005,
+      attack: 0.003,
       release: 0.08,
       knee: 10,
     });
@@ -208,6 +209,20 @@ export class AudioEngine {
           release: 0.01,
         },
       }).connect(this.masterBus);
+    }
+
+    // Pre-warm: silent trigger to initialize oscillator/noise internals.
+    // Without this, the first real trigger produces a startup transient
+    // (phase discontinuity or buffer allocation spike) that the 1ms
+    // attack envelope can't fully smooth and the compressor can't catch.
+    try {
+      if (synth instanceof Tone.NoiseSynth) {
+        synth.triggerAttackRelease(0.001, Tone.now(), 0);
+      } else {
+        (synth as Tone.Synth).triggerAttackRelease(spec.freq, 0.001, Tone.now(), 0);
+      }
+    } catch {
+      // Context may not be running yet — harmless, synth will warm on first real trigger
     }
 
     this.synths.set(key, synth);
