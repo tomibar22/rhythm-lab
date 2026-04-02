@@ -139,24 +139,9 @@ export class AudioEngine {
     callback: (boundaryTick: number) => void;
   } | null = null;
 
-  /**
-   * Master bus: all synths route here instead of directly to destination.
-   * Chain: synths → Gain(−8 dB) → destination
-   *
-   * Provides headroom so the sum of multiple layers doesn't clip.
-   * −8 dB ≈ 0.4× gain — allows ~6 layers at full volume simultaneously.
-   *
-   * We intentionally avoid DynamicsCompressorNode (used by Tone.Compressor
-   * and Tone.Limiter): it produces an audible artifact on the first signal
-   * after creation — a startup transient that no amount of headroom, attack
-   * tuning, or pre-warming can eliminate. This is a known Web Audio issue.
-   * Static gain is artifact-free and predictable.
-   */
-  private masterGain: Tone.Gain;
-
   constructor() {
-    this.masterGain = new Tone.Gain(0.4); // −8 dB
-    this.masterGain.toDestination();
+    // No master bus processing — synths go directly to destination.
+    // Headroom is handled by conservative per-layer volumes (0.8 default).
   }
 
   async init(): Promise<void> {
@@ -187,7 +172,7 @@ export class AudioEngine {
       synth = new Tone.NoiseSynth({
         noise: { type: spec.noiseType ?? "white" },
         envelope: { attack: 0.001, decay: spec.decay, sustain: 0 },
-      }).connect(this.masterGain);
+      }).toDestination();
     } else {
       synth = new Tone.Synth({
         oscillator: { type: spec.oscType },
@@ -197,7 +182,7 @@ export class AudioEngine {
           sustain: 0,
           release: 0.01,
         },
-      }).connect(this.masterGain);
+      }).toDestination();
     }
 
     this.synths.set(key, synth);
@@ -213,19 +198,18 @@ export class AudioEngine {
     try {
       if (synth.disposed) return;
 
-      // Decay microvariation: ±12% — breaks identical envelope repetition.
-      // Like hitting a drum skin at slightly different tensions each time.
-      const decayVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
+      // Duration microvariation: ±12% on note length — subtly varies how
+      // long each hit rings. We vary the `duration` param to triggerAttackRelease
+      // (which controls when release is called), NOT `synth.envelope.decay`
+      // (mutating envelope AudioParams before trigger causes first-hit artifacts).
+      const durVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
 
       if (synth instanceof Tone.NoiseSynth) {
-        synth.envelope.decay = decayVar;
-        synth.triggerAttackRelease(decayVar, time, vol);
+        synth.triggerAttackRelease(durVar, time, vol);
       } else {
         // Pitch microvariation: ±1% (~±17 cents) — alive but not detuned.
-        // Like a mallet landing on slightly different spots of a bar.
         const freqVar = spec.freq * (1.0 + (Math.random() - 0.5) * 0.02);
-        (synth as Tone.Synth).envelope.decay = decayVar;
-        (synth as Tone.Synth).triggerAttackRelease(freqVar, decayVar, time, vol);
+        (synth as Tone.Synth).triggerAttackRelease(freqVar, durVar, time, vol);
       }
     } catch {
       // Synth may have been disposed between check and trigger — ignore
@@ -691,10 +675,5 @@ export class AudioEngine {
       }
     }
     this.synths.clear();
-    try {
-      this.masterGain.dispose();
-    } catch {
-      // ignore disposal errors
-    }
   }
 }
