@@ -799,6 +799,10 @@ function LayerRow({
     setDensityText(String(Math.round(layer.density * 100)));
   }, [layer.density]);
 
+  useEffect(() => {
+    setSwingText(String(Math.round(layer.swing * 100)));
+  }, [layer.swing]);
+
   const commitSteps = () => {
     const val = parseInt(stepsText);
     if (!isNaN(val) && val >= 2 && val <= MAX_STEPS) {
@@ -1181,7 +1185,7 @@ function LayerRow({
                 <button
                   key={m}
                   className={`step-mult-btn ${activeMultiplier === m ? "active" : ""}`}
-                  onClick={() => onUpdateLayer({ subdivision: m })}
+                  onClick={() => onUpdateLayer({ subdivision: m, ...(m !== activeMultiplier ? { swing: 0.5 } : {}) })}
                   title={`${label} subdivision (${m} steps per beat)`}
                 >{label}</button>
               );
@@ -1192,7 +1196,7 @@ function LayerRow({
               <button
                 key={m}
                 className={`step-mult-btn ${activeMultiplier === m ? "active" : ""}`}
-                onClick={() => onUpdateLayer({ steps: targetSteps })}
+                onClick={() => onUpdateLayer({ steps: targetSteps, ...(m !== activeMultiplier ? { swing: 0.5 } : {}) })}
                 title={`${targetSteps} steps (${m} per beat)`}
               >{label}</button>
             );
