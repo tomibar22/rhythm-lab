@@ -186,6 +186,21 @@ export class AudioEngine {
       (synth as Tone.Synth).frequency.value = spec.freq;
     }
 
+    // Force the envelope's internal GainNode to 0 immediately.
+    // Web Audio GainNode defaults to gain=1.0. Without this, the first
+    // triggerAttack has a brief window where gain is 1.0 (full amplitude)
+    // before the envelope's setValueAtTime(0, time) takes effect —
+    // causing the first hit to sound louder/distorted. Subsequent triggers
+    // are fine because gain is already 0 from the previous note's release.
+    const envelope = synth instanceof Tone.NoiseSynth
+      ? synth.envelope
+      : (synth as Tone.Synth).envelope;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sig = (envelope as any)._sig;
+    if (sig && typeof sig.setValueAtTime === "function") {
+      sig.setValueAtTime(0, 0);
+    }
+
     this.synths.set(key, synth);
     return synth;
   }
