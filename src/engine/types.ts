@@ -40,6 +40,10 @@ export interface Layer {
   hitsPerCycle: number;
   /** Per-cycle play/rest pattern: 1 = play, 0 = rest. Loops. Default [1] = every cycle. */
   cyclePattern: (0 | 1)[];
+  /** Gap mode: "manual" = user-edited cyclePattern, "random" = auto-generated from gapDensity. */
+  gapMode: "manual" | "random";
+  /** Probability (0–1) of playing each cycle when gapMode="random". */
+  gapDensity: number;
   /** Random layers only: repeat the same random result for N extra play-cycles before regenerating. 0 = pure random. */
   repeatCycles: number;
   /**
@@ -70,6 +74,10 @@ export interface LayerGroup {
   gap: number;
   /** Per-cycle play/rest pattern for all group members. [1] = inactive (layers use own). Length > 1 = active (overrides layers). */
   cyclePattern: (0 | 1)[];
+  /** Gap mode: "manual" = user-edited cyclePattern, "random" = auto-generated from gapDensity. */
+  gapMode: "manual" | "random";
+  /** Probability (0–1) of playing each cycle when gapMode="random". */
+  gapDensity: number;
 }
 
 // ─────────────────────────────────────────────

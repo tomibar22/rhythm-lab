@@ -1505,6 +1505,74 @@ body {
   cursor: default;
 }
 
+/* Gap mode toggle (R button) */
+.gap-mode-btn {
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.gap-mode-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+}
+
+.gap-mode-btn.active {
+  background: var(--text-secondary);
+  border-color: var(--text-secondary);
+  color: var(--bg-deep);
+}
+
+.gap-mode-btn.active:hover {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+/* Gap density DragValue control */
+.gap-density {
+  display: flex;
+  align-items: center;
+  cursor: ns-resize;
+}
+
+.gap-density .control-input {
+  width: 28px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: right;
+  padding: 0;
+  pointer-events: none;
+  cursor: ns-resize;
+}
+
+.gap-density.editing .control-input {
+  pointer-events: auto;
+  cursor: text;
+  color: var(--text-primary);
+}
+
+.gap-density .control-unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+
 /* ─────────────────────────────────────────────
    CIRCLE VIEW
    ───────────────────────────────────────────── */

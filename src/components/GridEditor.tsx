@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Layer, LayerType, LayerGroup, SOUND_PRESETS, SoundPreset } from "../engine/types";
-import { STEP_MULTIPLIERS, GroupActions } from "../hooks/useRhythmLab";
+import { STEP_MULTIPLIERS, GroupActions, generateRandomGapPattern } from "../hooks/useRhythmLab";
 
 const MAX_STEPS = 128;
 
@@ -1091,7 +1091,9 @@ function LayerRow({
           ) : (
             <GapControl
               cyclePattern={layer.cyclePattern}
-              onChange={(cyclePattern) => onUpdateLayer({ cyclePattern })}
+              gapMode={layer.gapMode}
+              gapDensity={layer.gapDensity}
+              onChange={(updates) => onUpdateLayer(updates)}
             />
           )}
           <button
@@ -1662,7 +1664,9 @@ function GroupHeader({
         </div>
         <GapControl
           cyclePattern={group.cyclePattern}
-          onChange={(cyclePattern) => onUpdateGroup({ cyclePattern })}
+          gapMode={group.gapMode}
+          gapDensity={group.gapDensity}
+          onChange={(updates) => onUpdateGroup(updates)}
         />
         <button className="ctrl-btn clear-btn" onClick={onClear} title="Clear group patterns">CLR</button>
         <button className="ctrl-btn dup-btn" onClick={onDuplicate} title="Duplicate group">DUP</button>
@@ -1682,68 +1686,203 @@ function GroupHeader({
 
 function GapControl({
   cyclePattern,
+  gapMode,
+  gapDensity,
   onChange,
 }: {
   cyclePattern: (0 | 1)[];
-  onChange: (cyclePattern: (0 | 1)[]) => void;
+  gapMode: "manual" | "random";
+  gapDensity: number;
+  onChange: (updates: { cyclePattern?: (0 | 1)[]; gapMode?: "manual" | "random"; gapDensity?: number }) => void;
 }) {
+  const isRandom = gapMode === "random";
   const total = cyclePattern.length;
   const playCount = cyclePattern.filter((v) => v === 1).length;
-  const hasGap = cyclePattern.some((v) => v === 0);
+  const hasGap = isRandom || cyclePattern.some((v) => v === 0);
 
-  const tooltip = !hasGap
-    ? "Plays every cycle (click + to add rest cycles)"
-    : `${playCount} play, ${total - playCount} rest across ${total} cycles`;
+  // ── DragValue state for density ──
+  const [densityText, setDensityText] = useState(String(Math.round(gapDensity * 100)));
+  const [densityEditing, setDensityEditing] = useState(false);
+  const densityInputRef = useRef<HTMLInputElement>(null);
+  const densityDragStartY = useRef(0);
+  const densityDragStartValue = useRef(0);
+  const densityIsDragging = useRef(false);
+  const densityWheelAcc = useRef(0);
 
-  // Toggle individual dot — but prevent removing the last play dot
+  useEffect(() => {
+    if (!densityEditing) setDensityText(String(Math.round(gapDensity * 100)));
+  }, [gapDensity, densityEditing]);
+
+  const commitDensity = () => {
+    const v = parseInt(densityText);
+    const clamped = isNaN(v) ? 50 : Math.max(5, Math.min(100, v));
+    const rounded = Math.round(clamped / 5) * 5;
+    const newDensity = rounded / 100;
+    setDensityText(String(rounded));
+    onChange({ gapDensity: newDensity, cyclePattern: generateRandomGapPattern(newDensity) });
+  };
+
+  const handleDensityPointerDown = (e: React.PointerEvent) => {
+    if (densityEditing) return;
+    e.preventDefault();
+    densityDragStartY.current = e.clientY;
+    densityDragStartValue.current = Math.round(gapDensity * 100);
+    densityIsDragging.current = false;
+    const onMove = (ev: PointerEvent) => {
+      const dy = densityDragStartY.current - ev.clientY;
+      if (!densityIsDragging.current && Math.abs(dy) < 3) return;
+      densityIsDragging.current = true;
+      const steps = Math.round(dy / 6);
+      const raw = densityDragStartValue.current + steps * 5;
+      const clamped = Math.max(5, Math.min(100, raw));
+      const rounded = Math.round(clamped / 5) * 5;
+      setDensityText(String(rounded));
+      const newDensity = rounded / 100;
+      onChange({ gapDensity: newDensity, cyclePattern: generateRandomGapPattern(newDensity) });
+    };
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  };
+
+  const handleDensityDoubleClick = () => {
+    setDensityEditing(true);
+    setTimeout(() => densityInputRef.current?.select(), 0);
+  };
+
+  const handleDensityWheel = (e: React.WheelEvent) => {
+    if (densityEditing) return;
+    e.stopPropagation();
+    densityWheelAcc.current += e.deltaY;
+    const threshold = 30;
+    if (Math.abs(densityWheelAcc.current) < threshold) return;
+    const steps = -Math.sign(densityWheelAcc.current);
+    densityWheelAcc.current = 0;
+    const raw = Math.round(gapDensity * 100) + steps * 5;
+    const clamped = Math.max(5, Math.min(100, raw));
+    const rounded = Math.round(clamped / 5) * 5;
+    const newDensity = rounded / 100;
+    setDensityText(String(rounded));
+    onChange({ gapDensity: newDensity, cyclePattern: generateRandomGapPattern(newDensity) });
+  };
+
+  // Toggle between manual and random mode
+  const handleToggleMode = () => {
+    if (isRandom) {
+      // Switch to manual — reset to simple [1] pattern
+      onChange({ gapMode: "manual", cyclePattern: [1] });
+    } else {
+      // Switch to random — generate pattern from density
+      const density = gapDensity;
+      onChange({ gapMode: "random", cyclePattern: generateRandomGapPattern(density) });
+    }
+  };
+
+  // Reroll: generate a new random pattern with same density
+  const handleReroll = () => {
+    onChange({ cyclePattern: generateRandomGapPattern(gapDensity) });
+  };
+
+  // ── Manual mode handlers ──
   const handleDotClick = (i: number) => {
     const isPlay = cyclePattern[i] === 1;
     if (isPlay && playCount <= 1) return;
     const newPattern = [...cyclePattern] as (0 | 1)[];
     newPattern[i] = isPlay ? 0 : 1;
-    onChange(newPattern);
+    onChange({ cyclePattern: newPattern });
   };
 
-  // − removes last dot (but keep ≥ 1 total and ≥ 1 play)
   const handleMinus = () => {
     if (total <= 1) return;
     const newPattern = cyclePattern.slice(0, -1) as (0 | 1)[];
     if (newPattern.filter((v) => v === 1).length === 0) return;
-    onChange(newPattern);
+    onChange({ cyclePattern: newPattern });
   };
 
-  // + adds a rest dot at end
   const handlePlus = () => {
     if (total >= 16) return;
-    onChange([...cyclePattern, 0] as (0 | 1)[]);
+    onChange({ cyclePattern: [...cyclePattern, 0] as (0 | 1)[] });
   };
+
+  const tooltip = isRandom
+    ? `Random gaps: ${Math.round(gapDensity * 100)}% chance to play each cycle`
+    : !hasGap
+      ? "Plays every cycle (click + to add rest cycles)"
+      : `${playCount} play, ${total - playCount} rest across ${total} cycles`;
 
   return (
     <div
-      className={`gap-control ${hasGap ? "has-gap" : ""}`}
+      className={`gap-control ${hasGap ? "has-gap" : ""} ${isRandom ? "random-mode" : ""}`}
       onClick={(e) => e.stopPropagation()}
       title={tooltip}
     >
-      <div className="gap-dots">
-        {cyclePattern.map((v, i) => (
-          <span
-            key={i}
-            className={`gap-dot ${v === 1 ? "play" : "rest"} clickable ${total > 8 ? "small" : ""}`}
-            onClick={() => handleDotClick(i)}
-          />
-        ))}
-        {total >= 6 && <span className="gap-count">{total}</span>}
-      </div>
-      <button
-        className="gap-btn"
-        onClick={handleMinus}
-        disabled={total <= 1}
-      >−</button>
-      <button
-        className="gap-btn"
-        onClick={handlePlus}
-        disabled={total >= 16}
-      >+</button>
+      {isRandom ? (
+        <>
+          <button
+            className="gap-mode-btn active"
+            onClick={handleToggleMode}
+            title="Switch to manual gaps"
+          >R</button>
+          <div
+            className={`control gap-density ${densityEditing ? "editing" : ""}`}
+            onPointerDown={handleDensityPointerDown}
+            onDoubleClick={handleDensityDoubleClick}
+            onWheel={handleDensityWheel}
+          >
+            <input
+              ref={densityInputRef}
+              className="control-input"
+              type="text"
+              inputMode="numeric"
+              value={densityText}
+              readOnly={!densityEditing}
+              onChange={(e) => setDensityText(e.target.value)}
+              onBlur={() => { commitDensity(); setDensityEditing(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { commitDensity(); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
+                else if (e.key === "Escape") { setDensityText(String(Math.round(gapDensity * 100))); setDensityEditing(false); (e.target as HTMLInputElement).blur(); }
+              }}
+            />
+            <span className="control-unit">%</span>
+          </div>
+          <button
+            className="gap-btn"
+            onClick={handleReroll}
+            title="Reroll random pattern"
+          >↻</button>
+        </>
+      ) : (
+        <>
+          <button
+            className="gap-mode-btn"
+            onClick={handleToggleMode}
+            title="Switch to random gaps"
+          >R</button>
+          <div className="gap-dots">
+            {cyclePattern.map((v, i) => (
+              <span
+                key={i}
+                className={`gap-dot ${v === 1 ? "play" : "rest"} clickable ${total > 8 ? "small" : ""}`}
+                onClick={() => handleDotClick(i)}
+              />
+            ))}
+            {total >= 6 && <span className="gap-count">{total}</span>}
+          </div>
+          <button
+            className="gap-btn"
+            onClick={handleMinus}
+            disabled={total <= 1}
+          >−</button>
+          <button
+            className="gap-btn"
+            onClick={handlePlus}
+            disabled={total >= 16}
+          >+</button>
+        </>
+      )}
     </div>
   );
 }

@@ -94,6 +94,10 @@ export interface SavedTemplateLayer {
   groupId?: string;
   /** Per-cycle play/rest pattern. If absent, derive from legacy playCount+gap. */
   cyclePattern?: (0 | 1)[];
+  /** Gap mode: "manual" or "random". */
+  gapMode?: "manual" | "random";
+  /** Probability (0–1) of playing each cycle when gapMode="random". */
+  gapDensity?: number;
   /** Random repeat cycles. 0 = pure random per step. */
   repeatCycles?: number;
   /** Exact hits per cycle. 0 = density mode. */
@@ -110,6 +114,8 @@ export interface SavedTemplateGroup {
   volume: number;
   gap?: number;
   cyclePattern?: (0 | 1)[];
+  gapMode?: "manual" | "random";
+  gapDensity?: number;
 }
 
 // ─────────────────────────────────────────────
@@ -215,6 +221,7 @@ export function saveTemplate(
       density: l.density,
       swing: l.swing,
       cyclePattern: [...l.cyclePattern],
+      ...(l.gapMode !== "manual" ? { gapMode: l.gapMode, gapDensity: l.gapDensity } : {}),
       ...(l.repeatCycles > 0 ? { repeatCycles: l.repeatCycles } : {}),
       ...(l.hitsPerCycle > 0 ? { hitsPerCycle: l.hitsPerCycle } : {}),
       ...(l.polymetric ? { polymetric: true, subdivision: l.subdivision } : {}),

@@ -27,6 +27,19 @@ const MAX_STEPS = 128;
 // HELPERS
 // ─────────────────────────────────────────────
 
+/** Generate a random cyclePattern of given length where each cycle plays with the given probability. */
+export function generateRandomGapPattern(density: number, length = 16): (0 | 1)[] {
+  const pattern: (0 | 1)[] = [];
+  for (let i = 0; i < length; i++) {
+    pattern.push(Math.random() < density ? 1 : 0);
+  }
+  // Ensure at least one play cycle
+  if (!pattern.includes(1)) {
+    pattern[Math.floor(Math.random() * length)] = 1;
+  }
+  return pattern;
+}
+
 /** Convert legacy playCount+gap to cyclePattern. */
 function legacyCyclePattern(playCount?: number, gap?: number): (0 | 1)[] {
   const p = playCount ?? 1;
@@ -90,6 +103,8 @@ function layerAudioChanged(a: Layer, b: Layer): boolean {
   if (a.hitsPerCycle !== b.hitsPerCycle) return true;
   if (a.polymetric !== b.polymetric) return true;
   if (a.subdivision !== b.subdivision) return true;
+  if (a.gapMode !== b.gapMode) return true;
+  if (a.gapDensity !== b.gapDensity) return true;
   if (a.cyclePattern.length !== b.cyclePattern.length) return true;
   for (let i = 0; i < a.cyclePattern.length; i++) {
     if (a.cyclePattern[i] !== b.cyclePattern[i]) return true;
@@ -204,6 +219,8 @@ function createLayer(
     swing: overrides?.swing ?? 0.5,
     density,
     cyclePattern: overrides?.cyclePattern ?? [1],
+    gapMode: overrides?.gapMode ?? "manual",
+    gapDensity: overrides?.gapDensity ?? 0.5,
     repeatCycles: overrides?.repeatCycles ?? 0,
     hitsPerCycle: overrides?.hitsPerCycle ?? 0,
     polymetric: overrides?.polymetric,
@@ -253,6 +270,8 @@ function getInitialState() {
           volume: tl.volume,
           density: tl.density,
           cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
+          gapMode: tl.gapMode ?? "manual",
+          gapDensity: tl.gapDensity ?? 0.5,
           repeatCycles: tl.repeatCycles ?? 0,
           hitsPerCycle: tl.hitsPerCycle ?? 0,
           polymetric: tl.polymetric,
@@ -270,6 +289,8 @@ function getInitialState() {
         volume: g.volume ?? 1,
         gap: g.gap ?? 0,
         cyclePattern: g.cyclePattern ? [...g.cyclePattern] : [1] as (0 | 1)[],
+        gapMode: g.gapMode ?? "manual" as const,
+        gapDensity: g.gapDensity ?? 0.5,
       }));
       return {
         layers,
@@ -754,6 +775,8 @@ export function useRhythmLab() {
         gap: 0,
         volume: 1,
         cyclePattern: [1],
+        gapMode: "manual",
+        gapDensity: 0.5,
       }];
     });
   }, []);
@@ -926,6 +949,8 @@ export function useRhythmLab() {
         volume: tl.volume,
         density: tl.density,
         cyclePattern: tl.cyclePattern ? [...tl.cyclePattern] : legacyCyclePattern(tl.playCount, tl.gap),
+        gapMode: tl.gapMode ?? "manual",
+        gapDensity: tl.gapDensity ?? 0.5,
         repeatCycles: tl.repeatCycles ?? 0,
         hitsPerCycle: tl.hitsPerCycle ?? 0,
         polymetric: tl.polymetric,
@@ -943,6 +968,8 @@ export function useRhythmLab() {
       volume: g.volume ?? 1,
       gap: g.gap ?? 0,
       cyclePattern: g.cyclePattern ? [...g.cyclePattern] : [1] as (0 | 1)[],
+      gapMode: g.gapMode ?? "manual",
+      gapDensity: g.gapDensity ?? 0.5,
     }));
     setLayers(newLayers);
     setGroups(newGroups);

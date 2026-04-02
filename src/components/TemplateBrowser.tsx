@@ -55,7 +55,7 @@ export function TemplateBrowser({
   const handleSave = () => {
     const name = saveName.trim() || `Template ${templates.length + 1}`;
     const savedGroups = groups.length > 0
-      ? groups.map((g) => ({ id: g.id, name: g.name, volume: g.volume, ...(g.cyclePattern.length > 1 ? { cyclePattern: [...g.cyclePattern] } : {}) }))
+      ? groups.map((g) => ({ id: g.id, name: g.name, volume: g.volume, ...(g.cyclePattern.length > 1 ? { cyclePattern: [...g.cyclePattern] } : {}), ...(g.gapMode !== "manual" ? { gapMode: g.gapMode, gapDensity: g.gapDensity } : {}) }))
       : undefined;
     saveTemplate(name, layers, tempo, cycleBeats, effectiveOverwriteId || undefined, savedGroups, countdown);
     setTemplates(getSavedTemplates());
