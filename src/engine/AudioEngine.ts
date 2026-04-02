@@ -608,7 +608,13 @@ export class AudioEngine {
     transport.position = 0;
     // Don't reset cycleAlignTick — scheduleLayers already set it
     // (e.g., for countdown offset)
-    transport.start();
+    //
+    // Start slightly in the future (+50ms) so the first events at tick 0
+    // land within the Web Audio scheduling lookahead window. Without this,
+    // transport.start() fires immediately — the first event's scheduled
+    // time has already passed by the time the audio thread processes it,
+    // causing the envelope ramp to be truncated (click/pop on first hit).
+    transport.start("+0.05");
   }
 
   stop(): void {
