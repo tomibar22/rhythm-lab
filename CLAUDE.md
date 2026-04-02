@@ -133,8 +133,18 @@ Each has freq, decay, oscType, isNoise, noiseType. See `SOUND_PRESETS` in `types
 - `clearLayerParts(layerId)` — stop + dispose one layer
 - `clearAllParts()` — stop + dispose everything
 
+### Master Bus (Signal Chain)
+All synths route through a master bus instead of directly to destination:
+```
+synths → Channel (masterBus) → Compressor → Limiter → destination
+```
+- **Compressor**: gentle glue (−12 dB threshold, 3:1 ratio, 10 dB soft knee, 5 ms attack, 80 ms release). Tames the sum of multiple layers without squashing dynamics.
+- **Limiter**: hard ceiling at −1 dB — safety net for transient peaks.
+- Created in `AudioEngine` constructor, disposed in `dispose()`.
+- Prevents clipping when many layers hit simultaneously.
+
 ### Synth Reuse
-One synth per `${layerId}:${sound}`. Created on first use, reused across reschedules. Only replaced if the sound type changes.
+One synth per `${layerId}:${sound}`. Created on first use, reused across reschedules. Routed to `this.masterBus` (not `toDestination`). Only replaced if the sound type changes.
 
 ### Swing
 Applied to **odd-numbered steps** only:
