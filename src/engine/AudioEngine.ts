@@ -153,6 +153,23 @@ export class AudioEngine {
     // initialized
   }
 
+  /**
+   * Pre-create synths for all layers so they're fully initialized before
+   * any scheduling or transport start. Without this, synths are lazily
+   * created inside scheduleLayers and their first trigger fires with
+   * essentially zero time since construction — causing a startup click
+   * because the underlying OscillatorNode/AudioBufferSourceNode hasn't
+   * fully initialized within the Web Audio graph.
+   */
+  warmUpSynths(layers: Layer[], includeCountdown = false): void {
+    for (const layer of layers) {
+      this.getOrCreateSynth(layer.id, layer.sound);
+    }
+    if (includeCountdown) {
+      this.getOrCreateSynth("__countdown__", "ping");
+    }
+  }
+
   private getSpec(sound: SoundPreset): SoundSpec {
     return SOUND_PRESETS.find((s) => s.value === sound) ?? SOUND_PRESETS[0];
   }
@@ -171,13 +188,13 @@ export class AudioEngine {
     if (spec.isNoise) {
       synth = new Tone.NoiseSynth({
         noise: { type: spec.noiseType ?? "white" },
-        envelope: { attack: 0.01, decay: spec.decay, sustain: 0 },
+        envelope: { attack: 0.005, decay: spec.decay, sustain: 0 },
       }).toDestination();
     } else {
       synth = new Tone.Synth({
         oscillator: { type: spec.oscType },
         envelope: {
-          attack: 0.01,
+          attack: 0.005,
           decay: spec.decay,
           sustain: 0,
           release: 0.01,

@@ -443,6 +443,10 @@ export function useRhythmLab() {
       [...prevPlayIds].some((id) => !curPlayIds.has(id)) ||
       [...curPlayIds].some((id) => !prevPlayIds.has(id));
 
+    // Pre-create synths for any new layers so they're initialized
+    // before their first trigger (avoids first-hit click artifact).
+    engine.warmUpSynths(curEngine);
+
     if (playSetChanged) {
       // Full reschedule — mute/solo/add/remove affects which layers play
       engine.scheduleLayers(curEngine, cycleBts, cb);
@@ -525,6 +529,10 @@ export function useRhythmLab() {
         await engine.init();
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
         const cd = countdownRef.current;
+        // Pre-create all synths so they're fully initialized in the Web Audio
+        // graph before any scheduling or transport start. This eliminates the
+        // startup click on a synth's first-ever trigger.
+        engine.warmUpSynths(engineLayers, cd > 0);
         const alignTick = cd > 0 ? cd * cycleBeatsRef.current * 960 : 0;
         engine.scheduleLayers(
           engineLayers,
