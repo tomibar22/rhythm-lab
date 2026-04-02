@@ -91,12 +91,32 @@ function computeAccentWeights(
   }
 
   // Map: longer preceding gap → stronger accent
-  // Range: 0.88 (after shortest gap) to 1.0 (after longest gap)
-  const BASE = 0.88;
+  // Range: 0.75 (after shortest gap) to 1.0 (after longest gap)
+  // Wide enough to create musical contour in dense patterns.
+  const BASE = 0.75;
   const RANGE = 1.0 - BASE;
   for (let i = 0; i < onsets.length; i++) {
     const normalized = (iois[i] - minIOI) / (maxIOI - minIOI);
     weights[onsets[i].step] = BASE + normalized * RANGE;
+  }
+
+  // Consecutive-hit rolloff: in runs of 3+ adjacent onsets, inner hits
+  // are slightly attenuated — like a drummer's natural energy sag in the
+  // middle of a fast passage. First and last hits of each run keep full weight.
+  let runStart = -1;
+  for (let i = 0; i <= steps; i++) {
+    const isOn = i < steps && pattern[i] === 1;
+    if (isOn && runStart === -1) {
+      runStart = i;
+    } else if (!isOn && runStart !== -1) {
+      const runLen = i - runStart;
+      if (runLen >= 3) {
+        for (let j = runStart + 1; j < i - 1; j++) {
+          weights[j] *= 0.90; // ~10% dip on inner hits
+        }
+      }
+      runStart = -1;
+    }
   }
 
   return weights;
@@ -172,15 +192,20 @@ export class AudioEngine {
   ): void {
     try {
       if (synth.disposed) return;
+
+      // Decay microvariation: ±12% — breaks identical envelope repetition.
+      // Like hitting a drum skin at slightly different tensions each time.
+      const decayVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
+
       if (synth instanceof Tone.NoiseSynth) {
-        synth.triggerAttackRelease(spec.decay, time, vol);
+        synth.envelope.decay = decayVar;
+        synth.triggerAttackRelease(decayVar, time, vol);
       } else {
-        (synth as Tone.Synth).triggerAttackRelease(
-          spec.freq,
-          spec.decay,
-          time,
-          vol,
-        );
+        // Pitch microvariation: ±1% (~±17 cents) — alive but not detuned.
+        // Like a mallet landing on slightly different spots of a bar.
+        const freqVar = spec.freq * (1.0 + (Math.random() - 0.5) * 0.02);
+        (synth as Tone.Synth).envelope.decay = decayVar;
+        (synth as Tone.Synth).triggerAttackRelease(freqVar, decayVar, time, vol);
       }
     } catch {
       // Synth may have been disposed between check and trigger — ignore

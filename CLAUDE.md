@@ -143,19 +143,20 @@ Super-cycle = `(1 + gap)` cycles. Pattern plays in the first cycle, then rests f
 - Part `loopEnd = superCycleTicks`
 - Random loop uses modular arithmetic: `superStep < steps` → play, else rest
 
-### Humanized Velocity
-Applied at **playback time only** — never stored in pattern data. The `humanizeVelocity()` function (top of AudioEngine.ts) adds two effects:
+### Humanization
+All humanization is applied at **playback time only** — never stored in pattern data. Four layers work together to break the machine-gun effect:
 
-1. **Metric accent hierarchy** based on step position within beat:
-   - Beat 1: 100% (full weight)
-   - Other downbeats: 97%
-   - "And" (offbeats): 92%
-   - "E"/"A" (16th subdivisions): 84%
-   - Other: 88%
+1. **IOI-based accent weights** (`computeAccentWeights`): notes after longer gaps get more weight. Range: 0.75 (dense consecutive hits) to 1.0 (after a long rest). Naturally accents grouping boundaries in polyrhythms and swing.
 
-2. **Random micro-jitter**: ±6% random variation per hit.
+2. **Consecutive-hit rolloff**: in runs of 3+ adjacent onsets, inner hits get ~10% attenuation — like a drummer's natural energy sag in the middle of a fast passage. First and last hits of each run keep full weight.
 
-Both manual and random layers pass through this. It prevents the "machine gun" effect on dense patterns. If you ever hear inconsistent volumes, this is by design — don't "fix" it.
+3. **Velocity micro-jitter** (`humanizeVelocity`): ±6% random variation per hit on top of accent weights.
+
+4. **Pitch microvariation** (`triggerSynth`): tonal sounds vary ±1% (~±17 cents) per hit — alive but not detuned. Like a mallet landing on slightly different spots.
+
+5. **Decay microvariation** (`triggerSynth`): envelope decay varies ±12% per hit — breaks identical envelope repetition. Like hitting a drum skin at slightly different tensions.
+
+If you ever hear inconsistent volumes or subtle timbral variation, this is by design — don't "fix" it. Timing is always tight (grid-locked) — humanization is purely in dynamics and timbre.
 
 ### alignTick
 When parts start mid-transport (e.g., after a deferred cycle change at tick 3840):
