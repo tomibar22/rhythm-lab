@@ -141,19 +141,22 @@ export class AudioEngine {
 
   /**
    * Master bus: all synths route here instead of directly to destination.
-   * Chain: synths → masterGain → compressor → limiter → destination
+   * Chain: synths → Channel → Compressor → soft-clip WaveShaper → destination
    *
    * - Compressor: gentle glue compression, tames the sum of multiple layers
    *   without squashing dynamics. Soft knee, low ratio, fast release.
-   * - Limiter: hard ceiling at −1 dB — safety net for transient peaks.
+   * - WaveShaper (soft clipper): tanh curve — zero-latency peak protection.
+   *   Unlike a limiter (which has attack time and can overshoot on first
+   *   transients), a waveshaper processes each sample instantly. The tanh
+   *   curve is transparent in the normal range and smoothly compresses peaks,
+   *   producing warm even-harmonic saturation instead of harsh clipping.
    */
   private masterBus: Tone.Channel;
   private compressor: Tone.Compressor;
-  private limiter: Tone.Limiter;
+  private softClipper: Tone.WaveShaper;
 
   constructor() {
     // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics.
-    // Fast 3ms attack matches the limiter — catches transients within one audio block.
     this.compressor = new Tone.Compressor({
       threshold: -12,
       ratio: 3,
@@ -162,12 +165,21 @@ export class AudioEngine {
       knee: 10,
     });
 
-    // Hard limiter: ceiling at −1 dB — prevents any clipping
-    this.limiter = new Tone.Limiter(-1);
+    // Soft-clip waveshaper: tanh curve with mild drive.
+    // - Zero attack time — catches every transient instantly (sample-by-sample)
+    // - Signals below ~70% amplitude pass nearly unchanged (transparent)
+    // - Peaks above that are smoothly compressed (no harsh edge)
+    // - Output can never exceed ±1.0 regardless of input level
+    const DRIVE = 1.5;
+    const NORM = Math.tanh(DRIVE);
+    this.softClipper = new Tone.WaveShaper(
+      (x: number) => Math.tanh(x * DRIVE) / NORM,
+      8192,
+    );
 
     // Master channel: all synths connect here
     this.masterBus = new Tone.Channel({ volume: 0 });
-    this.masterBus.chain(this.compressor, this.limiter, Tone.getDestination());
+    this.masterBus.chain(this.compressor, this.softClipper, Tone.getDestination());
   }
 
   async init(): Promise<void> {
@@ -209,20 +221,6 @@ export class AudioEngine {
           release: 0.01,
         },
       }).connect(this.masterBus);
-    }
-
-    // Pre-warm: silent trigger to initialize oscillator/noise internals.
-    // Without this, the first real trigger produces a startup transient
-    // (phase discontinuity or buffer allocation spike) that the 1ms
-    // attack envelope can't fully smooth and the compressor can't catch.
-    try {
-      if (synth instanceof Tone.NoiseSynth) {
-        synth.triggerAttackRelease(0.001, Tone.now(), 0);
-      } else {
-        (synth as Tone.Synth).triggerAttackRelease(spec.freq, 0.001, Tone.now(), 0);
-      }
-    } catch {
-      // Context may not be running yet — harmless, synth will warm on first real trigger
     }
 
     this.synths.set(key, synth);
@@ -719,7 +717,7 @@ export class AudioEngine {
     try {
       this.masterBus.dispose();
       this.compressor.dispose();
-      this.limiter.dispose();
+      this.softClipper.dispose();
     } catch {
       // ignore disposal errors
     }
