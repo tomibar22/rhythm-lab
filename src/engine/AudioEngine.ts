@@ -141,19 +141,21 @@ export class AudioEngine {
 
   /**
    * Master bus: all synths route here instead of directly to destination.
-   * Chain: synths → Channel → Compressor → soft-clip WaveShaper → destination
+   * Chain: synths → Channel(−6 dB) → Compressor → Limiter → destination
    *
-   * - Compressor: gentle glue compression, tames the sum of multiple layers
-   *   without squashing dynamics. Soft knee, low ratio, fast release.
-   * - WaveShaper (soft clipper): tanh curve — zero-latency peak protection.
-   *   Unlike a limiter (which has attack time and can overshoot on first
-   *   transients), a waveshaper processes each sample instantly. The tanh
-   *   curve is transparent in the normal range and smoothly compresses peaks,
-   *   producing warm even-harmonic saturation instead of harsh clipping.
+   * The −6 dB headroom on the Channel is critical: it ensures that even when
+   * many layers fire simultaneously, the raw sum reaching the compressor is
+   * well below clipping. This means:
+   * - The compressor operates in its comfortable range (not overwhelmed)
+   * - The limiter only has to catch small overshoots (not 10+ dB peaks)
+   * - Even the limiter's first-transient overshoot (attack time) stays clean
+   *
+   * Without headroom, the first hit after idle can clip because the
+   * compressor/limiter haven't established gain reduction yet.
    */
   private masterBus: Tone.Channel;
   private compressor: Tone.Compressor;
-  private softClipper: Tone.WaveShaper;
+  private limiter: Tone.Limiter;
 
   constructor() {
     // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics.
@@ -165,21 +167,14 @@ export class AudioEngine {
       knee: 10,
     });
 
-    // Soft-clip waveshaper: tanh curve with mild drive.
-    // - Zero attack time — catches every transient instantly (sample-by-sample)
-    // - Signals below ~70% amplitude pass nearly unchanged (transparent)
-    // - Peaks above that are smoothly compressed (no harsh edge)
-    // - Output can never exceed ±1.0 regardless of input level
-    const DRIVE = 1.5;
-    const NORM = Math.tanh(DRIVE);
-    this.softClipper = new Tone.WaveShaper(
-      (x: number) => Math.tanh(x * DRIVE) / NORM,
-      8192,
-    );
+    // Hard limiter: ceiling at −1 dB — catches any transient peaks
+    this.limiter = new Tone.Limiter(-1);
 
-    // Master channel: all synths connect here
-    this.masterBus = new Tone.Channel({ volume: 0 });
-    this.masterBus.chain(this.compressor, this.softClipper, Tone.getDestination());
+    // Master channel at −6 dB: gives headroom so the compressor/limiter
+    // are never overwhelmed, even on the first transient after idle.
+    // The user's per-layer volumes are preserved — the headroom is internal.
+    this.masterBus = new Tone.Channel({ volume: -6 });
+    this.masterBus.chain(this.compressor, this.limiter, Tone.getDestination());
   }
 
   async init(): Promise<void> {
@@ -717,7 +712,7 @@ export class AudioEngine {
     try {
       this.masterBus.dispose();
       this.compressor.dispose();
-      this.softClipper.dispose();
+      this.limiter.dispose();
     } catch {
       // ignore disposal errors
     }
