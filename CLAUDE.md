@@ -64,7 +64,10 @@ Layers can be organized into **groups** — structural containers that overlay m
   muted: boolean,        // overrides individual layer mute
   solo: boolean,         // overrides individual layer solo
   volume: number,        // 0–1, multiplied on top of layer volume
-  gap: number,           // rest cycles (field exists, no group-level UI)
+  gap: number,           // @deprecated — use cyclePattern
+  cyclePattern: (0|1)[], // per-cycle play/rest pattern
+  gapMode: "manual" | "random",
+  gapDensity: number,    // 0–1, probability when gapMode="random"
 }
 ```
 
@@ -99,7 +102,9 @@ Layers can be organized into **groups** — structural containers that overlay m
   color: string,        // hex color from LAYER_COLORS
   swing: number,        // 0–1 (0.5=straight, 0.67=triplet)
   density: number,      // 0–1 (random layers only: probability of firing)
-  gap: number,          // 0+ rest cycles between play cycles
+  cyclePattern: (0|1)[], // per-cycle play/rest (gap) pattern
+  gapMode: "manual"|"random", // manual dots or auto-generated from gapDensity
+  gapDensity: number,   // 0–1, probability when gapMode="random"
   groupId?: string,     // optional group membership
 }
 ```
@@ -128,8 +133,18 @@ Each has freq, decay, oscType, isNoise, noiseType. See `SOUND_PRESETS` in `types
 - `clearLayerParts(layerId)` — stop + dispose one layer
 - `clearAllParts()` — stop + dispose everything
 
+### Master Bus (Signal Chain)
+All synths route through a master bus instead of directly to destination:
+```
+synths → Channel (masterBus) → Compressor → Limiter → destination
+```
+- **Compressor**: gentle glue (−12 dB threshold, 3:1 ratio, 10 dB soft knee, 5 ms attack, 80 ms release). Tames the sum of multiple layers without squashing dynamics.
+- **Limiter**: hard ceiling at −1 dB — safety net for transient peaks.
+- Created in `AudioEngine` constructor, disposed in `dispose()`.
+- Prevents clipping when many layers hit simultaneously. Don't add per-layer gain staging — the bus handles it.
+
 ### Synth Reuse
-One synth per `${layerId}:${sound}`. Created on first use, reused across reschedules. Only replaced if the sound type changes.
+One synth per `${layerId}:${sound}`. Created on first use, reused across reschedules. Routed to `this.masterBus` (not `toDestination`). Only replaced if the sound type changes.
 
 ### Swing
 Applied to **odd-numbered steps** only:
@@ -139,9 +154,11 @@ tickPos = pairStart + swing * 2 * stepTicks
 swing=0.5 → straight, swing=0.67 → triplet feel.
 
 ### Gap (Rest Cycles)
-Super-cycle = `(1 + gap)` cycles. Pattern plays in the first cycle, then rests for `gap` cycles.
-- Part `loopEnd = superCycleTicks`
-- Random loop uses modular arithmetic: `superStep < steps` → play, else rest
+`cyclePattern: (0|1)[]` controls which cycles play (1) and which rest (0). Loops.
+- Super-cycle = `cyclePattern.length` cycles. `loopEnd = superCycleTicks`.
+- Manual layers: events placed only in play-cycles. Random layers: modular check per step.
+- **Manual gap mode** (default): user toggles individual dots via GapControl (+/− buttons to add/remove cycles).
+- **Random gap mode** (`gapMode: "random"`): auto-generates a 16-cycle `cyclePattern` from `gapDensity` (0–1 probability). R toggle button switches modes; density is a DragValue control; ↻ rerolls the pattern. The engine sees only the generated `cyclePattern` — no scheduling changes needed.
 
 ### Humanization
 All humanization is applied at **playback time only** — never stored in pattern data. Four layers work together to break the machine-gun effect:
@@ -212,7 +229,7 @@ The layer-change useEffect avoids full reschedule on every edit:
 2. **Audio property changed** on individual layer → `rescheduleLayer()` (single)
 3. **Non-audio change** (name, color, selection) → no reschedule
 
-Audio-relevant properties: `steps`, `sound`, `volume`, `density`, `swing`, `gap`, `pattern`
+Audio-relevant properties: `steps`, `sound`, `volume`, `density`, `swing`, `cyclePattern`, `gapMode`, `gapDensity`, `pattern`, `repeatCycles`, `hitsPerCycle`, `polymetric`, `subdivision`
 
 Helper: `layerAudioChanged(oldLayer, newLayer)` compares these fields.
 Helper: `getPlayingIds(layers)` returns Set of IDs that should produce sound (respects mute/solo logic).
