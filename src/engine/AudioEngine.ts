@@ -145,6 +145,7 @@ export class AudioEngine {
       await Tone.getContext().resume();
     }
     Tone.getTransport().PPQ = APP_PPQ;
+    // initialized
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
@@ -177,28 +178,6 @@ export class AudioEngine {
           release: 0.01,
         },
       }).toDestination();
-      // Set initial frequency to the target so the oscillator doesn't
-      // start at the default 440Hz. On first triggerAttack, Tone.js
-      // calls oscillator.start(time) + frequency.setValueAtTime(freq, time)
-      // at the same scheduled time — but the oscillator can output a few
-      // samples at its current frequency before the automation takes effect.
-      // Without this, "kick" (55Hz) briefly sounds at 440Hz = audible click.
-      (synth as Tone.Synth).frequency.value = spec.freq;
-    }
-
-    // Force the envelope's internal GainNode to 0 immediately.
-    // Web Audio GainNode defaults to gain=1.0. Without this, the first
-    // triggerAttack has a brief window where gain is 1.0 (full amplitude)
-    // before the envelope's setValueAtTime(0, time) takes effect —
-    // causing the first hit to sound louder/distorted. Subsequent triggers
-    // are fine because gain is already 0 from the previous note's release.
-    const envelope = synth instanceof Tone.NoiseSynth
-      ? synth.envelope
-      : (synth as Tone.Synth).envelope;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sig = (envelope as any)._sig;
-    if (sig && typeof sig.setValueAtTime === "function") {
-      sig.setValueAtTime(0, 0);
     }
 
     this.synths.set(key, synth);
@@ -214,18 +193,19 @@ export class AudioEngine {
     try {
       if (synth.disposed) return;
 
-      // Duration microvariation: ±12% on note length — subtly varies how
-      // long each hit rings. We vary the `duration` param to triggerAttackRelease
-      // (which controls when release is called), NOT `synth.envelope.decay`
-      // (mutating envelope AudioParams before trigger causes first-hit artifacts).
-      const durVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
+      // Decay microvariation: ±12% — breaks identical envelope repetition.
+      // Like hitting a drum skin at slightly different tensions each time.
+      const decayVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
 
       if (synth instanceof Tone.NoiseSynth) {
-        synth.triggerAttackRelease(durVar, time, vol);
+        synth.envelope.decay = decayVar;
+        synth.triggerAttackRelease(decayVar, time, vol);
       } else {
         // Pitch microvariation: ±1% (~±17 cents) — alive but not detuned.
+        // Like a mallet landing on slightly different spots of a bar.
         const freqVar = spec.freq * (1.0 + (Math.random() - 0.5) * 0.02);
-        (synth as Tone.Synth).triggerAttackRelease(freqVar, durVar, time, vol);
+        (synth as Tone.Synth).envelope.decay = decayVar;
+        (synth as Tone.Synth).triggerAttackRelease(freqVar, decayVar, time, vol);
       }
     } catch {
       // Synth may have been disposed between check and trigger — ignore
