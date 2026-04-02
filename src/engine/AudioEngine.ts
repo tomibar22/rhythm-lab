@@ -154,20 +154,49 @@ export class AudioEngine {
   }
 
   /**
-   * Pre-create synths for all layers so they're fully initialized before
-   * any scheduling or transport start. Without this, synths are lazily
-   * created inside scheduleLayers and their first trigger fires with
-   * essentially zero time since construction — causing a startup click
-   * because the underlying OscillatorNode/AudioBufferSourceNode hasn't
-   * fully initialized within the Web Audio graph.
+   * Pre-create and silently trigger all synths so their internal
+   * OscillatorNode / envelope have completed at least one full
+   * attack-decay cycle before real playback begins.
+   *
+   * The first-ever triggerAttackRelease on a fresh Tone.Synth produces
+   * a click because the envelope's GainNode transitions from its
+   * uninitialized state. After one full trigger cycle the envelope is
+   * "primed" and subsequent triggers are clean.
+   *
+   * Must be awaited — the 60ms pause lets the silent trigger fully
+   * complete before real events are scheduled.
    */
-  warmUpSynths(layers: Layer[], includeCountdown = false): void {
+  async warmUpSynths(layers: Layer[], includeCountdown = false): Promise<void> {
+    const now = Tone.now();
+    const synthsToWarm: (Tone.Synth | Tone.NoiseSynth)[] = [];
     for (const layer of layers) {
-      this.getOrCreateSynth(layer.id, layer.sound);
+      const synth = this.getOrCreateSynth(layer.id, layer.sound);
+      synthsToWarm.push(synth);
     }
     if (includeCountdown) {
-      this.getOrCreateSynth("__countdown__", "ping");
+      synthsToWarm.push(this.getOrCreateSynth("__countdown__", "ping"));
     }
+
+    // Silent trigger: volume 0, very short, at current audio time.
+    // This primes the envelope's GainNode so the first real trigger is clean.
+    for (const synth of synthsToWarm) {
+      try {
+        if (synth.disposed) continue;
+        if (synth instanceof Tone.NoiseSynth) {
+          synth.triggerAttackRelease(0.01, now, 0);
+        } else {
+          (synth as Tone.Synth).triggerAttackRelease(
+            (synth as Tone.Synth).frequency.value || 440, 0.01, now, 0
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Wait for silent triggers to fully complete before returning.
+    // 60ms > attack(5ms) + duration(10ms) + release(10ms) + buffer slack.
+    await new Promise((r) => setTimeout(r, 60));
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
