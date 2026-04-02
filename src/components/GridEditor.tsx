@@ -1032,7 +1032,10 @@ function LayerRow({
   // In normal mode, multiplier is derived from steps / cycleBeats.
   const activeMultiplier = isPolymetric
     ? (layer.subdivision && STEP_MULTIPLIERS.includes(layer.subdivision as typeof STEP_MULTIPLIERS[number]) ? layer.subdivision : undefined)
-    : STEP_MULTIPLIERS.find((m) => m * cycleBeats === layer.steps);
+    : STEP_MULTIPLIERS.find((m) => {
+        const expected = m * cycleBeats;
+        return Number.isInteger(expected) ? expected === layer.steps : (m === 0.5 && layer.steps === Math.max(2, Math.round(expected)));
+      });
 
   return (
     <div
@@ -1190,8 +1193,10 @@ function LayerRow({
                 >{label}</button>
               );
             }
-            const targetSteps = m * cycleBeats;
-            if (targetSteps > MAX_STEPS || !Number.isInteger(targetSteps)) return null;
+            const rawSteps = m * cycleBeats;
+            // ×0.5: round to nearest integer (e.g. 3 beats → 2 steps) with min 2
+            const targetSteps = Number.isInteger(rawSteps) ? rawSteps : (m === 0.5 ? Math.max(2, Math.round(rawSteps)) : null);
+            if (targetSteps === null || targetSteps > MAX_STEPS) return null;
             return (
               <button
                 key={m}

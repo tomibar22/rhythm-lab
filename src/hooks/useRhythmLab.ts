@@ -47,11 +47,16 @@ function adjustLayersForCycleChange(
   return layers.map((l) => {
     // Polymetric layers have their own cycle — don't adjust when global changes
     if (l.polymetric) return l;
-    const multiplier = STEP_MULTIPLIERS.find((m) => m * oldBeats === l.steps);
+    // Match multiplier: exact for integers, rounded for ×0.5
+    const multiplier = STEP_MULTIPLIERS.find((m) => {
+      const expected = m * oldBeats;
+      return Number.isInteger(expected) ? expected === l.steps : (m === 0.5 && l.steps === Math.max(2, Math.round(expected)));
+    });
     if (!multiplier) return l;
 
-    const newSteps = multiplier * newBeats;
-    if (newSteps < 2 || newSteps > MAX_STEPS) return l;
+    const rawNewSteps = multiplier * newBeats;
+    const newSteps = Number.isInteger(rawNewSteps) ? rawNewSteps : (multiplier === 0.5 ? Math.max(2, Math.round(rawNewSteps)) : null);
+    if (newSteps === null || newSteps < 2 || newSteps > MAX_STEPS) return l;
 
     let newPattern: (0 | 1 | 2)[];
     if (l.type === "random") {
