@@ -139,34 +139,12 @@ export class AudioEngine {
     callback: (boundaryTick: number) => void;
   } | null = null;
 
-  private audioPathPrimed = false;
-
   async init(): Promise<void> {
     await Tone.start();
     if (Tone.getContext().state !== "running") {
       await Tone.getContext().resume();
     }
     Tone.getTransport().PPQ = APP_PPQ;
-
-    // Prime the OS audio output path with a short silent buffer.
-    // After AudioContext creation/resume, the first audio samples to
-    // reach the DAC often get clipped or distorted — the OS audio
-    // subsystem (power management, device wake-up, buffer allocation)
-    // needs real audio flowing to stabilize. This is below Tone.js,
-    // at the OS/hardware level, which is why no synth-level fix works.
-    //
-    // Playing a silent buffer through the raw AudioContext forces the
-    // entire pipeline (AudioContext → OS mixer → DAC) to warm up.
-    if (!this.audioPathPrimed) {
-      const ctx = Tone.getContext().rawContext;
-      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.05), ctx.sampleRate);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start();
-      await new Promise((r) => setTimeout(r, 100));
-      this.audioPathPrimed = true;
-    }
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
@@ -199,6 +177,13 @@ export class AudioEngine {
           release: 0.01,
         },
       }).toDestination();
+      // Set initial frequency to the target so the oscillator doesn't
+      // start at the default 440Hz. On first triggerAttack, Tone.js
+      // calls oscillator.start(time) + frequency.setValueAtTime(freq, time)
+      // at the same scheduled time — but the oscillator can output a few
+      // samples at its current frequency before the automation takes effect.
+      // Without this, "kick" (55Hz) briefly sounds at 440Hz = audible click.
+      (synth as Tone.Synth).frequency.value = spec.freq;
     }
 
     this.synths.set(key, synth);
