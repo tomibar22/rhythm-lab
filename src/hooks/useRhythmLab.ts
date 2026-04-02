@@ -525,10 +525,6 @@ export function useRhythmLab() {
         await engine.init();
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
         const cd = countdownRef.current;
-        // Silently trigger all synths and wait for them to complete one full
-        // envelope cycle. This primes the envelope GainNode so the first
-        // real trigger doesn't produce a click artifact.
-        await engine.warmUpSynths(engineLayers, cd > 0);
         const alignTick = cd > 0 ? cd * cycleBeatsRef.current * 960 : 0;
         engine.scheduleLayers(
           engineLayers,
