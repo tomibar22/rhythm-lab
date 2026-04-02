@@ -171,13 +171,13 @@ export class AudioEngine {
     if (spec.isNoise) {
       synth = new Tone.NoiseSynth({
         noise: { type: spec.noiseType ?? "white" },
-        envelope: { attack: 0.005, decay: spec.decay, sustain: 0 },
+        envelope: { attack: 0.01, decay: spec.decay, sustain: 0 },
       }).toDestination();
     } else {
       synth = new Tone.Synth({
         oscillator: { type: spec.oscType },
         envelope: {
-          attack: 0.005,
+          attack: 0.01,
           decay: spec.decay,
           sustain: 0,
           release: 0.01,
