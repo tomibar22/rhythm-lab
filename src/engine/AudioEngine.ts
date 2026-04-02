@@ -141,40 +141,22 @@ export class AudioEngine {
 
   /**
    * Master bus: all synths route here instead of directly to destination.
-   * Chain: synths → Channel(−6 dB) → Compressor → Limiter → destination
+   * Chain: synths → Gain(−8 dB) → destination
    *
-   * The −6 dB headroom on the Channel is critical: it ensures that even when
-   * many layers fire simultaneously, the raw sum reaching the compressor is
-   * well below clipping. This means:
-   * - The compressor operates in its comfortable range (not overwhelmed)
-   * - The limiter only has to catch small overshoots (not 10+ dB peaks)
-   * - Even the limiter's first-transient overshoot (attack time) stays clean
+   * Provides headroom so the sum of multiple layers doesn't clip.
+   * −8 dB ≈ 0.4× gain — allows ~6 layers at full volume simultaneously.
    *
-   * Without headroom, the first hit after idle can clip because the
-   * compressor/limiter haven't established gain reduction yet.
+   * We intentionally avoid DynamicsCompressorNode (used by Tone.Compressor
+   * and Tone.Limiter): it produces an audible artifact on the first signal
+   * after creation — a startup transient that no amount of headroom, attack
+   * tuning, or pre-warming can eliminate. This is a known Web Audio issue.
+   * Static gain is artifact-free and predictable.
    */
-  private masterBus: Tone.Channel;
-  private compressor: Tone.Compressor;
-  private limiter: Tone.Limiter;
+  private masterGain: Tone.Gain;
 
   constructor() {
-    // Gentle bus compressor: kicks in around −12 dB, low ratio preserves dynamics.
-    this.compressor = new Tone.Compressor({
-      threshold: -12,
-      ratio: 3,
-      attack: 0.003,
-      release: 0.08,
-      knee: 10,
-    });
-
-    // Hard limiter: ceiling at −1 dB — catches any transient peaks
-    this.limiter = new Tone.Limiter(-1);
-
-    // Master channel at −6 dB: gives headroom so the compressor/limiter
-    // are never overwhelmed, even on the first transient after idle.
-    // The user's per-layer volumes are preserved — the headroom is internal.
-    this.masterBus = new Tone.Channel({ volume: -6 });
-    this.masterBus.chain(this.compressor, this.limiter, Tone.getDestination());
+    this.masterGain = new Tone.Gain(0.4); // −8 dB
+    this.masterGain.toDestination();
   }
 
   async init(): Promise<void> {
@@ -205,7 +187,7 @@ export class AudioEngine {
       synth = new Tone.NoiseSynth({
         noise: { type: spec.noiseType ?? "white" },
         envelope: { attack: 0.001, decay: spec.decay, sustain: 0 },
-      }).connect(this.masterBus);
+      }).connect(this.masterGain);
     } else {
       synth = new Tone.Synth({
         oscillator: { type: spec.oscType },
@@ -215,7 +197,7 @@ export class AudioEngine {
           sustain: 0,
           release: 0.01,
         },
-      }).connect(this.masterBus);
+      }).connect(this.masterGain);
     }
 
     this.synths.set(key, synth);
@@ -710,9 +692,7 @@ export class AudioEngine {
     }
     this.synths.clear();
     try {
-      this.masterBus.dispose();
-      this.compressor.dispose();
-      this.limiter.dispose();
+      this.masterGain.dispose();
     } catch {
       // ignore disposal errors
     }
