@@ -123,7 +123,8 @@ function computeAccentWeights(
 }
 
 export class AudioEngine {
-  private synths = new Map<string, Tone.Synth | Tone.NoiseSynth>();
+  /** Pre-rendered audio buffers for each sound preset. */
+  private soundBuffers = new Map<SoundPreset, AudioBuffer>();
   /** Per-layer scheduled events (Part or Loop). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private layerEvents = new Map<string, any[]>();
@@ -140,8 +141,11 @@ export class AudioEngine {
   } | null = null;
 
   /**
-   * Master bus: all synths route here instead of directly to destination.
-   * Chain: synths → Channel → Compressor → Limiter → destination
+   * Master bus: all sounds route here instead of directly to destination.
+   * Chain: bufferBridge (native GainNode) → Channel → Compressor → Limiter → destination
+   *
+   * bufferBridge is a raw Web Audio GainNode that pre-rendered buffer sources
+   * connect to. It feeds into the Tone.js signal chain via the Channel.
    *
    * Prevents clipping when multiple layers fire simultaneously.
    * - Compressor: gentle glue, tames the sum without squashing dynamics.
@@ -150,6 +154,8 @@ export class AudioEngine {
   private masterBus: Tone.Channel;
   private compressor: Tone.Compressor;
   private limiter: Tone.Limiter;
+  /** Native GainNode bridge: buffer sources connect here → feeds masterBus. */
+  private bufferBridge: GainNode | null = null;
 
   constructor() {
     this.compressor = new Tone.Compressor({
@@ -170,70 +176,163 @@ export class AudioEngine {
       await Tone.getContext().resume();
     }
     Tone.getTransport().PPQ = APP_PPQ;
-    // initialized
+
+    // Create native GainNode bridge for buffer playback → Tone.js master bus.
+    // Buffer sources (native Web Audio) connect to this, which feeds into
+    // the Tone.Channel via Tone's connect() (handles Tone↔native interop).
+    const rawCtx = Tone.getContext().rawContext;
+    if (rawCtx) {
+      this.bufferBridge = rawCtx.createGain();
+      this.bufferBridge.gain.value = 1.0;
+      // Use Tone's connect to bridge native → Tone node
+      Tone.connect(this.bufferBridge, this.masterBus);
+    }
+
+    // Pre-render all sound presets into AudioBuffers.
+    // This eliminates first-hit transient artifacts — no oscillator startup.
+    await this.prerenderAllSounds();
+  }
+
+  /**
+   * Pre-render each sound preset into an AudioBuffer using OfflineAudioContext.
+   * Each buffer contains one "hit" of the sound — a short oscillator/noise burst
+   * with the preset's envelope. Played back via BufferSourceNode at trigger time.
+   */
+  private async prerenderAllSounds(): Promise<void> {
+    const sampleRate = Tone.getContext().sampleRate;
+
+    for (const spec of SOUND_PRESETS) {
+      // Buffer length: attack + decay + a small tail for safety
+      const duration = 0.001 + spec.decay + 0.02;
+      const length = Math.ceil(duration * sampleRate);
+      const offline = new OfflineAudioContext(1, length, sampleRate);
+
+      if (spec.isNoise) {
+        // Render filtered noise burst
+        const bufferSize = length;
+        const noiseBuffer = offline.createBuffer(1, bufferSize, sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+
+        if (spec.noiseType === "brown") {
+          // Brown noise: integrated white noise
+          let lastOut = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            lastOut = (lastOut + 0.02 * white) / 1.02;
+            data[i] = lastOut * 3.5;
+          }
+        } else {
+          // Pink noise approximation (Paul Kellet's method)
+          let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+            b6 = white * 0.115926;
+          }
+        }
+
+        const source = offline.createBufferSource();
+        source.buffer = noiseBuffer;
+
+        // Apply envelope via gain node
+        const gain = offline.createGain();
+        gain.gain.setValueAtTime(0, 0);
+        gain.gain.linearRampToValueAtTime(1.0, 0.001); // attack
+        gain.gain.exponentialRampToValueAtTime(0.001, 0.001 + spec.decay); // decay
+
+        source.connect(gain);
+        gain.connect(offline.destination);
+        source.start(0);
+      } else {
+        // Render tonal oscillator burst
+        const osc = offline.createOscillator();
+        osc.type = spec.oscType;
+        osc.frequency.setValueAtTime(spec.freq, 0);
+
+        const gain = offline.createGain();
+        gain.gain.setValueAtTime(0, 0);
+        gain.gain.linearRampToValueAtTime(1.0, 0.001); // attack
+        gain.gain.exponentialRampToValueAtTime(0.001, 0.001 + spec.decay); // decay
+
+        osc.connect(gain);
+        gain.connect(offline.destination);
+        osc.start(0);
+        osc.stop(duration);
+      }
+
+      const rendered = await offline.startRendering();
+      this.soundBuffers.set(spec.value, rendered);
+    }
   }
 
   private getSpec(sound: SoundPreset): SoundSpec {
     return SOUND_PRESETS.find((s) => s.value === sound) ?? SOUND_PRESETS[0];
   }
 
-  private getOrCreateSynth(
-    layerId: string,
+  /**
+   * Trigger a pre-rendered sound buffer at the given time.
+   *
+   * Humanization is applied via:
+   * - Gain (volume + accent + jitter)
+   * - Playback rate (±1% pitch variation for tonal sounds)
+   * - The buffer itself already has decay baked in; small rate variation
+   *   implicitly varies the decay length too.
+   */
+  private triggerSound(
     sound: SoundPreset,
-  ): Tone.Synth | Tone.NoiseSynth {
-    const key = `${layerId}:${sound}`;
-    const existing = this.synths.get(key);
-    if (existing) return existing;
-
-    const spec = this.getSpec(sound);
-    let synth: Tone.Synth | Tone.NoiseSynth;
-
-    if (spec.isNoise) {
-      synth = new Tone.NoiseSynth({
-        noise: { type: spec.noiseType ?? "white" },
-        envelope: { attack: 0.001, decay: spec.decay, sustain: 0 },
-      }).connect(this.masterBus);
-    } else {
-      synth = new Tone.Synth({
-        oscillator: { type: spec.oscType },
-        envelope: {
-          attack: 0.001,
-          decay: spec.decay,
-          sustain: 0,
-          release: 0.01,
-        },
-      }).connect(this.masterBus);
-    }
-
-    this.synths.set(key, synth);
-    return synth;
-  }
-
-  private triggerSynth(
-    synth: Tone.Synth | Tone.NoiseSynth,
     spec: SoundSpec,
     time: number,
     vol: number,
   ): void {
     try {
-      if (synth.disposed) return;
+      const buffer = this.soundBuffers.get(sound);
+      if (!buffer) return;
 
-      // Decay microvariation: ±12% — breaks identical envelope repetition.
-      // Like hitting a drum skin at slightly different tensions each time.
-      const decayVar = spec.decay * (1.0 + (Math.random() - 0.5) * 0.24);
+      const ctx = Tone.getContext().rawContext;
+      if (!ctx || ctx.state !== "running") return;
 
-      if (synth instanceof Tone.NoiseSynth) {
-        synth.envelope.decay = decayVar;
-        synth.triggerAttackRelease(decayVar, time, vol);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+
+      // Pitch microvariation for tonal sounds: ±1% (~±17 cents)
+      // For noise sounds: ±3% rate variation affects timbre subtly
+      if (!spec.isNoise) {
+        source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.02;
       } else {
-        // Pitch microvariation: ±1% (~±17 cents) — alive but not detuned.
-        // Like a mallet landing on slightly different spots of a bar.
-        const freqVar = spec.freq * (1.0 + (Math.random() - 0.5) * 0.02);
-        (synth as Tone.Synth).envelope.decay = decayVar;
-        (synth as Tone.Synth).triggerAttackRelease(freqVar, decayVar, time, vol);
+        source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.06;
       }
+
+      // Volume via gain node — carries the humanized velocity
+      const gain = ctx.createGain();
+      gain.gain.value = vol;
+
+      // Route: source → gain → bufferBridge → masterBus → compressor → limiter → out
+      source.connect(gain);
+      if (this.bufferBridge) {
+        gain.connect(this.bufferBridge);
+      } else {
+        // Fallback: connect directly to destination
+        gain.connect(ctx.destination);
+      }
+
+      source.start(time);
+      // Auto-cleanup: source disconnects itself when done
+      source.onended = () => {
+        try {
+          source.disconnect();
+          gain.disconnect();
+        } catch {
+          // already disconnected
+        }
+      };
     } catch {
-      // Synth may have been disposed between check and trigger — ignore
+      // Context may be closing or in a bad state — ignore
     }
   }
 
@@ -422,8 +521,8 @@ export class AudioEngine {
     onStep: StepCallback,
     alignTick: number,
   ): void {
-    const synth = this.getOrCreateSynth(layer.id, layer.sound);
     const spec = this.getSpec(layer.sound);
+    const layerSound = layer.sound;
     const stepTicks = cycleTicks / layer.steps;
     const cyclePattern = layer.cyclePattern;
 
@@ -466,7 +565,7 @@ export class AudioEngine {
       if (layerVolume > 0) {
         const rawVol = (event.velocity / 127) * layerVolume;
         const vol = humanizeVelocity(rawVol, event.accent);
-        this.triggerSynth(synth, spec, time, vol);
+        this.triggerSound(layerSound, spec, time, vol);
       }
       Tone.getDraw().schedule(() => {
         onStep(layerId, event.step);
@@ -487,8 +586,8 @@ export class AudioEngine {
     alignTick: number,
     initialCounter: number = 0,
   ): void {
-    const synth = this.getOrCreateSynth(layer.id, layer.sound);
     const spec = this.getSpec(layer.sound);
+    const layerSound = layer.sound;
     const stepTicks = cycleTicks / layer.steps;
 
     const layerVolume = layer.volume;
@@ -575,7 +674,7 @@ export class AudioEngine {
           if (layerVolume > 0) {
             const rawVol = (100 / 127) * layerVolume;
             const vol = humanizeVelocity(rawVol, 1.0);
-            this.triggerSynth(synth, spec, triggerTime, vol);
+            this.triggerSound(layerSound, spec, triggerTime, vol);
           }
           Tone.getDraw().schedule(() => {
             onStep(layerId, currentStep);
@@ -601,7 +700,6 @@ export class AudioEngine {
     onBeat?: (info: { beat: number; totalBeats: number; isBarStart: boolean }) => void,
   ): void {
     const spec = this.getSpec("ping");
-    const synth = this.getOrCreateSynth("__countdown__", "ping");
     const totalBeats = countdownBars * cycleBeats;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -614,7 +712,7 @@ export class AudioEngine {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const part = new Tone.Part((time: number, event: any) => {
-      this.triggerSynth(synth, spec, time, event.vol);
+      this.triggerSound("ping", spec, time, event.vol);
       if (onBeat) {
         // Fire on main thread so React can update
         Tone.getDraw().schedule(() => {
@@ -688,15 +786,12 @@ export class AudioEngine {
     this.stopBoundarySentinel();
     this.clearAllParts();
     this.stop();
-    for (const synth of this.synths.values()) {
-      try {
-        if (!synth.disposed) synth.dispose();
-      } catch {
-        // ignore disposal errors
-      }
-    }
-    this.synths.clear();
+    this.soundBuffers.clear();
     try {
+      if (this.bufferBridge) {
+        this.bufferBridge.disconnect();
+        this.bufferBridge = null;
+      }
       this.masterBus.dispose();
       this.compressor.dispose();
       this.limiter.dispose();
