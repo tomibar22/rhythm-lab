@@ -36,19 +36,23 @@ App.tsx                      ← wires hook → components
 
 | File | Purpose |
 |------|---------|
-| `src/engine/types.ts` | `Layer`, `LayerGroup`, `SoundPreset`, `SoundSpec`, `PatternPreset`, `LAYER_COLORS`, `SOUND_PRESETS` |
+| `src/engine/types.ts` | `Layer`, `LayerGroup`, `SoundPreset`, `SynthPreset`, `SoundSpec`, `PatternPreset`, `LAYER_COLORS`, `SOUND_PRESETS` |
 | `src/engine/RhythmEngine.ts` | `euclidean(k,n)`, `rotate()`, `invert()`, `getIOIs()`, `getPatternLibrary()` |
-| `src/engine/AudioEngine.ts` | `AudioEngine` class — Tone.js scheduling, synths, cycle boundaries |
+| `src/engine/AudioEngine.ts` | `AudioEngine` class — Tone.js scheduling, synths, sample loading, cycle boundaries |
+| `src/engine/sampleManifest.ts` | `SAMPLE_PACKS` registry, `ALL_SAMPLES`, grouping helpers, `isSampleSound()` |
 | `src/engine/storage.ts` | `savePattern()`, `saveTemplate()`, `renameTemplate()`, `reorderTemplates()` — localStorage + built-in merge |
 | `src/engine/defaultTemplates.ts` | `BUILT_IN_TEMPLATES` array, `isBuiltIn()`, `exportTemplatesForBundling()` |
 | `src/hooks/useRhythmLab.ts` | Central state hook — layers, transport, smart rescheduling |
 | `src/App.tsx` | Root component, keyboard shortcuts (Space = play) |
 | `src/App.css` | All styling (single CSS file) |
 | `src/components/GridEditor.tsx` | `GridEditor` + `LayerRow` + `StepButton` |
+| `src/components/SoundBrowser.tsx` | Collapsible sound picker — synth presets + sample packs, By Pack / By Type views |
 | `src/components/CircleView.tsx` | Canvas-based concentric ring visualization |
 | `src/components/PatternBrowser.tsx` | Collapsible pattern library (saved, presets, euclidean) |
 | `src/components/TemplateBrowser.tsx` | Template save/load/overwrite/rename/reorder |
 | `src/components/TransportBar.tsx` | Play, tempo (DragValue), tap tempo, cycle beats ±1, pending indicator |
+| `public/samples/` | Static .wav sample packs (KENDRICK, MOONCHILD, SLUM, TIGRAN) — served as-is by Vite |
+| `Sample Packs/` | Raw source samples (may contain timestamps in filenames) — NOT deployed |
 
 ## Data Model
 
@@ -114,11 +118,31 @@ Layers can be organized into **groups** — structural containers that overlay m
 - Random: `pattern[i] = 1` means "step i is allowed". Each allowed step fires with probability `density`.
 
 ### Sounds
-10 presets in two families:
-- **Tonal** (sine oscillators, ascending pitch): `kick` (55Hz), `drop` (330Hz), `tap` (700Hz), `pip` (1000Hz), `tick` (1400Hz), `ping` (2200Hz)
-- **Noise** (filtered noise, varying color/decay): `brush` (brown, short), `dust` (pink, short), `mist` (pink, medium), `haze` (brown, long)
 
-Each has freq, decay, oscType, isNoise, noiseType. See `SOUND_PRESETS` in `types.ts`.
+**Two sound systems** coexist:
+
+1. **Synth presets ("Metronome")** — 10 pre-rendered oscillator/noise buffers:
+   - **Tonal** (sine, ascending pitch): `kick` (55Hz), `drop` (330Hz), `tap` (700Hz), `pip` (1000Hz), `tick` (1400Hz), `ping` (2200Hz)
+   - **Noise** (filtered, varying color/decay): `brush` (brown, short), `dust` (pink, short), `mist` (pink, medium), `haze` (brown, long)
+   - Each has freq, decay, oscType, isNoise, noiseType. See `SOUND_PRESETS` in `types.ts`.
+
+2. **Sample packs** — .wav files in `public/samples/{PackName}/`:
+   - Current packs: KENDRICK, MOONCHILD, SLUM, TIGRAN
+   - Registry: `SAMPLE_PACKS` array in `src/engine/sampleManifest.ts`
+   - Sound IDs use `"PACK/NAME"` format (e.g. `"TIGRAN/KICK1"`) — the `/` distinguishes samples from synth presets
+   - Loaded on-demand via `fetch` + `decodeAudioData`, cached in `AudioEngine.soundBuffers`
+   - Categories auto-derived from filename prefix (KICK1 → KICK, HIHAT OPEN2 → HIHAT)
+
+**`SoundPreset` type** = `SynthPreset | string` — accepts both synth names and sample IDs. `isSampleSound(id)` checks for `/`.
+
+**Sound Browser** (`SoundBrowser.tsx`): collapsible dropdown in each layer row. Two grouping modes: "By Pack" and "By Type". Click previews + selects. Metronome section always shown first.
+
+### Adding a New Sample Pack
+1. Drop the folder into `public/samples/{PackName}/` (clean filenames, no timestamps)
+2. Add an entry to `SAMPLE_PACKS` in `src/engine/sampleManifest.ts`
+3. Commit + push — the sound browser picks it up automatically
+
+Raw source samples live in `Sample Packs/` (not deployed). When syncing from there, strip timestamp patterns (`[YYYY-MM-DD HHMMSS]`) from filenames.
 
 ## Audio Engine Internals
 
@@ -417,10 +441,15 @@ Design principles:
 5. If affects scheduling: handle in `scheduleManualLayer()` / `scheduleRandomLayer()` in `AudioEngine.ts`
 6. If saved: add to `SavedPattern` / `SavedTemplateLayer` in `storage.ts`
 
-### New sound preset
-1. Add to `SoundPreset` union type in `types.ts`
+### New synth preset
+1. Add to `SynthPreset` union type in `types.ts`
 2. Add spec to `SOUND_PRESETS` array in `types.ts`
-3. AudioEngine handles it automatically via `getSpec()` + `triggerSynth()`
+3. AudioEngine handles it automatically via `getSpec()` + pre-render
+
+### New sample pack
+1. Copy .wav files to `public/samples/{PackName}/` (clean names, no timestamps)
+2. Add entry to `SAMPLE_PACKS` in `src/engine/sampleManifest.ts`
+3. Sound browser + audio engine pick it up automatically
 
 ### New pattern preset
 1. Add to `getPatternLibrary()` in `RhythmEngine.ts`
