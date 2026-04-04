@@ -64,7 +64,7 @@ export const SAMPLE_PACKS: SamplePack[] = [
   {
     name: "TIGRAN",
     samples: [
-      "KICK1", "KICK2", "KICK3", "KICK4", "KICK5", "KICK6", "KICK7",
+      "KICK1", "KICK2", "KICK3", "KICK5", "KICK7",
       "SNARE1", "SNARE2", "SNARE3", "SNARE4", "SNARE5", "SNARE6", "SNARE7", "SNARE8",
       "HIHAT1", "HIHAT2", "HIHAT3", "HIHAT4", "HIHAT5", "HIHAT6", "HIHAT7", "HIHAT8", "HIHAT9", "HIHAT10",
       "HIHAT OPEN1", "HIHAT OPEN2",
