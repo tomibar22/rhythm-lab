@@ -32,7 +32,7 @@ export interface Layer {
   solo: boolean;
   /** UI color */
   color: string;
-  /** Swing ratio: 0.5 = straight, 0.67 = triplet swing */
+  /** Swing ratio: 0.33 = early triplet, 0.5 = straight, 0.67 = late triplet swing */
   swing: number;
   /** Density for random layers: 0–1 probability of each step firing */
   density: number;

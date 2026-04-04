@@ -887,8 +887,8 @@ function LayerRow({
   );
 
   // ── Swing control handlers ──
-  // Display: 0–100% (0=straight, 100=triplet feel)
-  // Internal: 0.5–0.67 (swing ratio for odd-indexed steps)
+  // Display: -100–+100% (-100=early triplet, 0=straight, +100=late triplet)
+  // Internal: 0.33–0.67 (swing ratio for odd-indexed steps)
   const swingToDisplay = (internal: number) => Math.round(((internal - 0.5) / 0.17) * 100);
   const displayToSwing = (display: number) => 0.5 + (display / 100) * 0.17;
 
@@ -898,7 +898,7 @@ function LayerRow({
 
   const commitSwing = () => {
     const val = parseInt(swingText);
-    if (!isNaN(val) && val >= 0 && val <= 100) {
+    if (!isNaN(val) && val >= -100 && val <= 100) {
       onUpdateLayer({ swing: displayToSwing(val) });
     } else {
       setSwingText(String(swingToDisplay(layer.swing)));
@@ -921,7 +921,7 @@ function LayerRow({
         const steps = Math.trunc(dy / 3);
         if (steps !== 0) isDraggingSwing.current = true;
         const base = Math.round(swingDragStart.current / 5) * 5;
-        const raw = Math.min(100, Math.max(0, base + steps * 5));
+        const raw = Math.min(100, Math.max(-100, base + steps * 5));
         onUpdateLayer({ swing: displayToSwing(raw) });
       };
 
@@ -955,7 +955,7 @@ function LayerRow({
         const steps = Math.trunc(swingWheelAcc.current / threshold);
         swingWheelAcc.current -= steps * threshold;
         const cur = swingToDisplay(layer.swing);
-        const raw = Math.min(100, Math.max(0, cur - steps * 5));
+        const raw = Math.min(100, Math.max(-100, cur - steps * 5));
         onUpdateLayer({ swing: displayToSwing(raw) });
       }
     },
@@ -1309,7 +1309,7 @@ function LayerRow({
             onPointerDown={handleSwingPointerDown}
             onDoubleClick={handleSwingDoubleClick}
             onWheel={handleSwingWheel}
-            title="Swing amount (0=straight, 100=triplet feel). Drag or double-click to type"
+            title="Swing amount (−100=early, 0=straight, +100=triplet feel). Drag or double-click to type"
           >
             <span className="swing-label">swing</span>
             <input
