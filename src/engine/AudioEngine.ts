@@ -358,10 +358,10 @@ export class AudioEngine {
       // Pitch microvariation:
       // - Synth tonal: ±1% (~±17 cents)
       // - Synth noise: ±3% rate variation
-      // - Samples: ±0.5% subtle pitch variation (preserve character)
+      // - Samples: ±1.5% pitch variation (~±26 cents, natural feel)
       if (spec === null) {
         // Sample
-        source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.01;
+        source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.03;
       } else if (!spec.isNoise) {
         source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.02;
       } else {
