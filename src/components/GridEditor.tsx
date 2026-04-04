@@ -1303,7 +1303,7 @@ function LayerRow({
           )
         )}
 
-        {activeMultiplier === 2 && (
+        {activeMultiplier != null && activeMultiplier >= 2 && activeMultiplier % 2 === 0 && (
           <div
             className={`swing-control ${swingEditing ? "editing" : ""}`}
             onPointerDown={handleSwingPointerDown}
