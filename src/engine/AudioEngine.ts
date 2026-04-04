@@ -25,8 +25,8 @@ type StepCallback = (layerId: string, step: number) => void;
  * Never modifies stored pattern data — purely a rendering-time effect.
  */
 function humanizeVelocity(baseVelocity: number, accentWeight: number): number {
-  // ±6% random variation — breaks machine-gun effect
-  const jitter = 1.0 + (Math.random() - 0.5) * 0.12;
+  // ±10% random variation — breaks machine-gun effect
+  const jitter = 1.0 + (Math.random() - 0.5) * 0.20;
   return Math.min(1.0, Math.max(0, baseVelocity * accentWeight * jitter));
 }
 
