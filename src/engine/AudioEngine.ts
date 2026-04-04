@@ -128,6 +128,8 @@ export class AudioEngine {
   private soundBuffers = new Map<string, AudioBuffer>();
   /** Tracks in-flight sample loads to avoid duplicate fetches. */
   private sampleLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
+  /** Whether init() has been called. */
+  private initialized = false;
   /** Per-layer scheduled events (Part or Loop). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private layerEvents = new Map<string, any[]>();
@@ -174,6 +176,7 @@ export class AudioEngine {
   }
 
   async init(): Promise<void> {
+    if (this.initialized) return;
     await Tone.start();
     if (Tone.getContext().state !== "running") {
       await Tone.getContext().resume();
@@ -194,6 +197,7 @@ export class AudioEngine {
     // Pre-render all sound presets into AudioBuffers.
     // This eliminates first-hit transient artifacts — no oscillator startup.
     await this.prerenderAllSounds();
+    this.initialized = true;
   }
 
   /**
@@ -842,6 +846,8 @@ export class AudioEngine {
    * Used by the sound browser to audition samples on click.
    */
   async previewSound(soundId: string, volume = 0.7): Promise<void> {
+    // Ensure audio context + synth buffers are ready (may not have pressed play yet)
+    await this.init();
     await this.ensureSoundLoaded(soundId);
     const ctx = Tone.getContext().rawContext;
     if (!ctx) return;
