@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Layer, LayerType, LayerGroup, SOUND_PRESETS, SoundPreset } from "../engine/types";
+import { Layer, LayerType, LayerGroup } from "../engine/types";
 import { STEP_MULTIPLIERS, GroupActions, generateRandomGapPattern } from "../hooks/useRhythmLab";
+import { AudioEngine } from "../engine/AudioEngine";
+import { SoundBrowser } from "./SoundBrowser";
 
 const MAX_STEPS = 128;
 
@@ -21,6 +23,7 @@ interface GridEditorProps {
   onAddLayer: (type: LayerType) => void;
   onClearPattern: (layerId: string) => void;
   onReorderLayers: (fromIndex: number, toIndex: number, targetGroupId?: string | null) => void;
+  getEngine: () => AudioEngine;
 }
 
 // ── VisualRow-based drag system ──
@@ -55,6 +58,7 @@ export function GridEditor({
   onAddLayer,
   onClearPattern,
   onReorderLayers,
+  getEngine,
 }: GridEditorProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Slot index for the drop indicator line. null = no indicator.
@@ -467,6 +471,7 @@ export function GridEditor({
         e, layer.id, layer.name, layer.color,
       )}
       groupGapActive={inGroup && layer.groupId ? (groupMap.get(layer.groupId)?.cyclePattern.length ?? 1) > 1 : false}
+      getEngine={getEngine}
     />
   );
 
@@ -698,6 +703,7 @@ interface LayerRowProps {
   onUngroupLayer?: () => void;
   onHandlePointerDown: (e: React.PointerEvent) => void;
   groupGapActive?: boolean;
+  getEngine: () => AudioEngine;
 }
 
 function LayerRow({
@@ -722,6 +728,7 @@ function LayerRow({
   onUngroupLayer,
   onHandlePointerDown,
   groupGapActive,
+  getEngine,
 }: LayerRowProps) {
   // ── Step painting state ──
   const paintModeRef = useRef<0 | 1 | 2 | null>(null); // null = not painting
@@ -1064,21 +1071,11 @@ function LayerRow({
             onChange={(e) => onUpdateLayer({ name: e.target.value })}
             onClick={(e) => e.stopPropagation()}
           />
-          <select
-            className="layer-sound"
+          <SoundBrowser
             value={layer.sound}
-            onChange={(e) => {
-              onUpdateLayer({ sound: e.target.value as SoundPreset });
-              (e.target as HTMLSelectElement).blur();
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {SOUND_PRESETS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            onChange={(sound) => onUpdateLayer({ sound })}
+            getEngine={getEngine}
+          />
         </div>
 
         <div className="layer-controls">

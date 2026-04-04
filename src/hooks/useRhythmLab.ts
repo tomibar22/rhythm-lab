@@ -524,6 +524,7 @@ export function useRhythmLab() {
       } else {
         await engine.init();
         const engineLayers = getEngineReadyLayers(layersRef.current, groupsRef.current);
+        await engine.preloadLayerSounds(engineLayers);
         const cd = countdownRef.current;
         const alignTick = cd > 0 ? cd * cycleBeatsRef.current * 960 : 0;
         engine.scheduleLayers(

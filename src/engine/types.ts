@@ -84,7 +84,7 @@ export interface LayerGroup {
 // SOUNDS
 // ─────────────────────────────────────────────
 
-export type SoundPreset =
+export type SynthPreset =
   | "kick"
   | "drop"
   | "tap"
@@ -96,8 +96,15 @@ export type SoundPreset =
   | "mist"
   | "haze";
 
+/**
+ * Sound identifier: either a synth preset name (e.g. "kick")
+ * or a sample path (e.g. "TIGRAN/KICK1").
+ * Sample sounds contain a "/" — synth presets never do.
+ */
+export type SoundPreset = SynthPreset | (string & {});
+
 export interface SoundSpec {
-  value: SoundPreset;
+  value: SynthPreset;
   label: string;
   /** Base frequency in Hz (ignored for noise-based sounds) */
   freq: number;

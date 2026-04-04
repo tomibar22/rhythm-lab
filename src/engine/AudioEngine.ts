@@ -13,6 +13,7 @@
 
 import * as Tone from "tone";
 import { Layer, SOUND_PRESETS, SoundPreset, SoundSpec } from "./types";
+import { ALL_SAMPLES, isSampleSound } from "./sampleManifest";
 
 const APP_PPQ = 960;
 
@@ -123,8 +124,10 @@ function computeAccentWeights(
 }
 
 export class AudioEngine {
-  /** Pre-rendered audio buffers for each sound preset. */
-  private soundBuffers = new Map<SoundPreset, AudioBuffer>();
+  /** Pre-rendered audio buffers for synth presets + loaded samples. Keyed by sound ID. */
+  private soundBuffers = new Map<string, AudioBuffer>();
+  /** Tracks in-flight sample loads to avoid duplicate fetches. */
+  private sampleLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
   /** Per-layer scheduled events (Part or Loop). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private layerEvents = new Map<string, any[]>();
@@ -271,8 +274,56 @@ export class AudioEngine {
     }
   }
 
-  private getSpec(sound: SoundPreset): SoundSpec {
+  private getSpec(sound: SoundPreset): SoundSpec | null {
+    if (isSampleSound(sound)) return null; // samples don't have a SoundSpec
     return SOUND_PRESETS.find((s) => s.value === sound) ?? SOUND_PRESETS[0];
+  }
+
+  /**
+   * Load a sample .wav file into an AudioBuffer and cache it.
+   * Returns the buffer, or null if loading fails.
+   * Safe to call multiple times — deduplicates in-flight requests.
+   */
+  async loadSample(soundId: string): Promise<AudioBuffer | null> {
+    if (this.soundBuffers.has(soundId)) return this.soundBuffers.get(soundId)!;
+    if (this.sampleLoadPromises.has(soundId)) return this.sampleLoadPromises.get(soundId)!;
+
+    const entry = ALL_SAMPLES.find((s) => s.id === soundId);
+    if (!entry) return null;
+
+    const promise = (async () => {
+      try {
+        const response = await fetch(entry.url);
+        if (!response.ok) return null;
+        const arrayBuffer = await response.arrayBuffer();
+        const ctx = Tone.getContext().rawContext;
+        if (!ctx) return null;
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        this.soundBuffers.set(soundId, audioBuffer);
+        return audioBuffer;
+      } catch {
+        return null;
+      } finally {
+        this.sampleLoadPromises.delete(soundId);
+      }
+    })();
+
+    this.sampleLoadPromises.set(soundId, promise);
+    return promise;
+  }
+
+  /** Ensure a sound is ready to play. For synth presets this is instant; for samples it loads the file. */
+  async ensureSoundLoaded(soundId: string): Promise<void> {
+    if (this.soundBuffers.has(soundId)) return;
+    if (isSampleSound(soundId)) {
+      await this.loadSample(soundId);
+    }
+  }
+
+  /** Pre-load all sample sounds used by a set of layers. Call before scheduling. */
+  async preloadLayerSounds(layers: Layer[]): Promise<void> {
+    const sampleIds = [...new Set(layers.map((l) => l.sound).filter(isSampleSound))];
+    await Promise.all(sampleIds.map((id) => this.ensureSoundLoaded(id)));
   }
 
   /**
@@ -286,7 +337,7 @@ export class AudioEngine {
    */
   private triggerSound(
     sound: SoundPreset,
-    spec: SoundSpec,
+    spec: SoundSpec | null,
     time: number,
     vol: number,
   ): void {
@@ -300,9 +351,14 @@ export class AudioEngine {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
 
-      // Pitch microvariation for tonal sounds: ±1% (~±17 cents)
-      // For noise sounds: ±3% rate variation affects timbre subtly
-      if (!spec.isNoise) {
+      // Pitch microvariation:
+      // - Synth tonal: ±1% (~±17 cents)
+      // - Synth noise: ±3% rate variation
+      // - Samples: ±0.5% subtle pitch variation (preserve character)
+      if (spec === null) {
+        // Sample
+        source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.01;
+      } else if (!spec.isNoise) {
         source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.02;
       } else {
         source.playbackRate.value = 1.0 + (Math.random() - 0.5) * 0.06;
@@ -521,8 +577,8 @@ export class AudioEngine {
     onStep: StepCallback,
     alignTick: number,
   ): void {
-    const spec = this.getSpec(layer.sound);
-    const layerSound = layer.sound;
+    const spec = this.getSpec(layer.sound); // null for samples — that's fine
+    const layerSound = layer.sound as string;
     const stepTicks = cycleTicks / layer.steps;
     const cyclePattern = layer.cyclePattern;
 
@@ -587,7 +643,7 @@ export class AudioEngine {
     initialCounter: number = 0,
   ): void {
     const spec = this.getSpec(layer.sound);
-    const layerSound = layer.sound;
+    const layerSound = layer.sound as string;
     const stepTicks = cycleTicks / layer.steps;
 
     const layerVolume = layer.volume;
@@ -779,6 +835,19 @@ export class AudioEngine {
     const offsetTicks = transport.ticks - this.cycleAlignTick;
     const currentTicks = ((offsetTicks % cycleTicks) + cycleTicks) % cycleTicks;
     return currentTicks / cycleTicks;
+  }
+
+  /**
+   * Preview a sound immediately (outside of transport scheduling).
+   * Used by the sound browser to audition samples on click.
+   */
+  async previewSound(soundId: string, volume = 0.7): Promise<void> {
+    await this.ensureSoundLoaded(soundId);
+    const ctx = Tone.getContext().rawContext;
+    if (!ctx) return;
+    if (ctx.state === "suspended") await ctx.resume();
+    const spec = this.getSpec(soundId);
+    this.triggerSound(soundId, spec, ctx.currentTime, volume);
   }
 
   dispose(): void {

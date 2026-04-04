@@ -78,6 +78,7 @@ export default function App() {
             onAddLayer={lab.addLayer}
             onClearPattern={lab.clearPattern}
             onReorderLayers={lab.reorderLayers}
+            getEngine={lab.getEngine}
           />
         </div>
 

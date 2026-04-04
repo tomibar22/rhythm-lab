@@ -458,19 +458,180 @@ body {
   outline: none;
 }
 
-.layer-sound {
+/* ── Sound Browser ── */
+
+.sound-browser-wrapper {
+  position: relative;
+}
+
+.sound-browser-trigger {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text-secondary);
-  font-size: 14px;
-  padding: 5px 10px;
+  font-size: 13px;
+  padding: 4px 8px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: border-color 0.15s;
 }
 
-.layer-sound:focus {
-  outline: none;
-  border-color: var(--border);
+.sound-browser-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.sound-browser-trigger.open {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.sound-browser-label {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sound-browser-chevron {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.sound-browser-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  width: 260px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sound-browser-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sound-browser-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.sound-browser-tab:hover {
+  color: var(--text-secondary);
+}
+
+.sound-browser-tab.active {
+  color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.sound-browser-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.sound-browser-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sound-browser-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.sound-section {
+  margin: 0;
+}
+
+.sound-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.sound-section-header:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sound-section-chevron {
+  font-size: 9px;
+  width: 10px;
+  opacity: 0.5;
+}
+
+.sound-section-title {
+  flex: 1;
+  text-align: left;
+}
+
+.sound-section-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.sound-section-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 10px 8px;
+}
+
+.sound-chip {
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+
+.sound-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.sound-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
 }
 
 /* Step grid */
