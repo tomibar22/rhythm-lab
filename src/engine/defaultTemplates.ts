@@ -110,11 +110,13 @@ export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
     tempo: 140,
     cycleBeats: 8,
     layers: [
-      { name: "Kick", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 1, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "Ping", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "ping", volume: 0.4, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "2&4", type: "manual", steps: 8, pattern: [0, 1, 0, 1, 0, 1, 0, 1], sound: "dust", volume: 0.4, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "beats", type: "manual", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "haze", volume: 0.2, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "swing", type: "random", steps: 16, pattern: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], sound: "mist", volume: 0.2, density: 0.25, swing: 0.6275, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Kick", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "JAZZ-MULTI/KICK", volume: 1, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 1, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 7", type: "random", steps: 16, pattern: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/KICK", volume: 0.4, density: 0.1, swing: 0.6445000000000001, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "2&4", type: "manual", steps: 8, pattern: [0, 1, 0, 1, 0, 1, 0, 1], sound: "JAZZ-MULTI/HH CLOSE", volume: 0.2, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "beats", type: "manual", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/RIDE", volume: 0.35, density: 0.5, swing: 0.5085, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "swing", type: "random", steps: 16, pattern: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], sound: "JAZZ-MULTI/RIDE", volume: 0.4, density: 0.3, swing: 0.6615, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 5", type: "random", steps: 16, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/XSTICK", volume: 0.5, density: 0.15, swing: 0.67, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 6", type: "random", steps: 16, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/RACK TOM", volume: 0.5, density: 0.05, swing: 0.653, cyclePattern: [1, 1, 1, 1, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
     ],
     groups: [{ id: "02dc14b8-45d2-4450-8788-b2d03d2bc65b", name: "Swing Playback", volume: 1 }],
     savedAt: 0,
@@ -125,11 +127,13 @@ export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
     tempo: 140,
     cycleBeats: 8,
     layers: [
-      { name: "Kick", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "kick", volume: 0.9, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "Ping", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "ping", volume: 0.15, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "2&4", type: "manual", steps: 8, pattern: [0, 1, 0, 1, 0, 1, 0, 1], sound: "dust", volume: 0.3, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "beats", type: "manual", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "haze", volume: 0.2, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
-      { name: "swing", type: "random", steps: 16, pattern: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], sound: "mist", volume: 0.1, density: 0.25, swing: 0.6275, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Kick", type: "manual", steps: 8, pattern: [1, 0, 0, 0, 0, 0, 0, 0], sound: "JAZZ-MULTI/KICK", volume: 1, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 1, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 7", type: "random", steps: 16, pattern: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/KICK", volume: 0.4, density: 0.1, swing: 0.6445000000000001, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "2&4", type: "manual", steps: 8, pattern: [0, 1, 0, 1, 0, 1, 0, 1], sound: "JAZZ-MULTI/HH CLOSE", volume: 0.2, density: 0.5, swing: 0.5, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "beats", type: "manual", steps: 8, pattern: [1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/RIDE", volume: 0.35, density: 0.5, swing: 0.5085, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "swing", type: "random", steps: 16, pattern: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1], sound: "JAZZ-MULTI/RIDE", volume: 0.4, density: 0.3, swing: 0.6615, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 5", type: "random", steps: 16, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/XSTICK", volume: 0.5, density: 0.15, swing: 0.67, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
+      { name: "Random 6", type: "random", steps: 16, pattern: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], sound: "JAZZ-MULTI/RACK TOM", volume: 0.5, density: 0.05, swing: 0.653, cyclePattern: [1, 1, 0, 0, 0, 0], groupId: "02dc14b8-45d2-4450-8788-b2d03d2bc65b" },
     ],
     groups: [{ id: "02dc14b8-45d2-4450-8788-b2d03d2bc65b", name: "Swing Playback", volume: 1 }],
     savedAt: 0,
@@ -276,19 +280,15 @@ export const BUILT_IN_TEMPLATES: SavedTemplate[] = [
   },
 ];
 
-/** Check if a template is built-in (cannot be deleted/renamed by users) */
-export function isBuiltIn(templateId: string): boolean {
-  return templateId.startsWith("builtin:");
+/** Check if a template ID is a built-in template. */
+export function isBuiltIn(id: string): boolean {
+  return id.startsWith("builtin:");
 }
 
 /**
- * Call this from the browser console to export ALL templates (built-in + user)
- * in their current display order as code for BUILT_IN_TEMPLATES.
- *
- * Usage (in browser console):
- *   copy(exportTemplatesForBundling())
- *
- * Then paste into the BUILT_IN_TEMPLATES array in this file.
+ * Export templates for bundling into the app.
+ * Run `copy(exportTemplatesForBundling())` in the browser console,
+ * then paste the result into the BUILT_IN_TEMPLATES array above.
  */
 export function exportTemplatesForBundling(): string {
   try {
