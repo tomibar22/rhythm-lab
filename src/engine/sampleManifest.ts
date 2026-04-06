@@ -7,6 +7,10 @@
  *   2. Add an entry to SAMPLE_PACKS below with each filename (without .wav)
  *   3. That's it — the sound browser and audio engine pick it up automatically.
  *
+ * For multi-sample packs (round-robin variations), use the `multiSamples` field
+ * instead of `samples`. Each entry defines a display name, file prefix, and count.
+ * The engine loads all variations and randomly picks one per trigger for natural feel.
+ *
  * Sample IDs follow the format "pack/FILENAME" (e.g. "TIGRAN/KICK1").
  * Category is auto-derived from the filename prefix (KICK, SNARE, HIHAT, etc.).
  */
@@ -20,13 +24,28 @@ export interface SampleEntry {
   pack: string;
   /** Auto-derived category (e.g. "KICK", "SNARE", "HIHAT") */
   category: string;
-  /** URL path to the .wav file */
+  /** URL path to the .wav file (first variant for multi-samples) */
   url: string;
+  /** All variant URLs for multi-sample entries. Undefined for single-sample. */
+  variantUrls?: string[];
 }
 
 export interface SamplePack {
   name: string;
-  samples: string[]; // filenames without .wav
+  /** Single-file samples — filenames without .wav */
+  samples: string[];
+  /** Multi-sample entries — each name maps to multiple variation files */
+  multiSamples?: MultiSampleDef[];
+}
+
+/** A multi-sample instrument: one sound ID backed by multiple .wav variations. */
+export interface MultiSampleDef {
+  /** Display name and sound ID suffix (e.g. "RIDE") */
+  name: string;
+  /** Filename prefix in public/samples/ (e.g. "ride" → "ride - 1.wav", "ride - 2.wav", ...) */
+  filePrefix: string;
+  /** Number of variations (files numbered 1 through count) */
+  count: number;
 }
 
 /**
@@ -34,6 +53,57 @@ export interface SamplePack {
  * Filenames should NOT include the .wav extension.
  */
 export const SAMPLE_PACKS: SamplePack[] = [
+  {
+    name: "JAZZ-MULTI",
+    samples: [],
+    multiSamples: [
+      // Kicks
+      { name: "KICK",              filePrefix: "kick - snares on",         count: 6  },
+      { name: "KICK SNROFF",       filePrefix: "kick - snares off",        count: 5  },
+      { name: "BOP KICK",          filePrefix: "bop kick - snares on",     count: 10 },
+      { name: "BOP KICK SNROFF",   filePrefix: "bop kick - snares off",    count: 6  },
+      // Snares
+      { name: "SNARE",             filePrefix: "snare - snares on",        count: 16 },
+      { name: "SNARE SNROFF",      filePrefix: "snare - snares off",       count: 6  },
+      { name: "RIMSHOT",           filePrefix: "rimshot - snares on",      count: 9  },
+      { name: "RIMSHOT SNROFF",    filePrefix: "rimshot - snares off",     count: 6  },
+      { name: "STICKSHOT",         filePrefix: "stickshot - snares on",    count: 8  },
+      { name: "STICKSHOT SNROFF",  filePrefix: "stickshot - snares off",   count: 6  },
+      { name: "XSTICK",            filePrefix: "xstick - snares on",       count: 8  },
+      { name: "XSTICK SNROFF",     filePrefix: "xstick - snares off",      count: 7  },
+      // Hihats
+      { name: "HH CLOSE",         filePrefix: "hihat - close",            count: 7  },
+      { name: "HH CLOSED",        filePrefix: "hihat - closed",           count: 8  },
+      { name: "HH CLOSED SIDE",   filePrefix: "hihat - closed side",      count: 5  },
+      { name: "HH OPEN",          filePrefix: "hihat - open",             count: 3  },
+      { name: "HH OPENED1",       filePrefix: "hihat - opened 1",         count: 8  },
+      { name: "HH OPENED2",       filePrefix: "hihat - opened 2",         count: 7  },
+      { name: "HH OPENED3",       filePrefix: "hihat - opened 3",         count: 9  },
+      { name: "HH OPENED4",       filePrefix: "hihat - opened 4",         count: 6  },
+      { name: "HH OPENED5",       filePrefix: "hihat - opened 5",         count: 4  },
+      // Ride
+      { name: "RIDE",              filePrefix: "ride",                     count: 5  },
+      { name: "RIDE BELL",         filePrefix: "ride - bell",              count: 3  },
+      { name: "RIDE CRASH",        filePrefix: "ride - crash",             count: 5  },
+      { name: "FLAT RIDE",         filePrefix: "flat ride",                count: 7  },
+      { name: "FLAT RIDE CRASH",   filePrefix: "flat ride - crash",        count: 2  },
+      // Toms
+      { name: "RACK TOM",         filePrefix: "rack tom - snares on",     count: 9  },
+      { name: "RACK TOM SNROFF",  filePrefix: "rack tom - snares off",    count: 8  },
+      { name: "FLOOR TOM",        filePrefix: "floor tom - snares on",    count: 8  },
+      { name: "FLOOR TOM SNROFF", filePrefix: "floor tom - snares off",   count: 7  },
+    ],
+  },
+  {
+    name: "JAZZ",
+    samples: [
+      "KICK1", "KICK2",
+      "SNARE1", "SNARE2", "SNARE3", "SNARE4", "SNARE5",
+      "HIHAT1", "HIHAT2",
+      "BRUSH1", "BRUSH2",
+      "PERC1", "PERC2", "PERC3", "PERC4", "PERC5", "PERC6",
+    ],
+  },
   {
     name: "KENDRICK",
     samples: [
@@ -72,16 +142,6 @@ export const SAMPLE_PACKS: SamplePack[] = [
       "PERC1", "PERC2", "PERC3", "PERC4", "PERC5",
     ],
   },
-  {
-    name: "JAZZ",
-    samples: [
-      "KICK1", "KICK2",
-      "SNARE1", "SNARE2", "SNARE3", "SNARE4", "SNARE5",
-      "HIHAT1", "HIHAT2",
-      "BRUSH1", "BRUSH2",
-      "PERC1", "PERC2", "PERC3", "PERC4", "PERC5", "PERC6",
-    ],
-  },
 ];
 
 /** Derive category from a sample filename (e.g. "KICK1" → "KICK", "SNARE+CLAP" → "SNARE"). */
@@ -95,13 +155,17 @@ function deriveCategory(name: string): string {
 
 /** All known sample categories, in display order. */
 export const SAMPLE_CATEGORIES = [
-  "KICK", "SNARE", "HIHAT", "CYM", "BRUSH", "PERC", "SNAP", "SHAKER",
+  "KICK", "SNARE", "RIMSHOT", "STICKSHOT", "XSTICK",
+  "HIHAT", "HH", "RIDE", "FLAT", "CYM",
+  "RACK", "FLOOR", "TOM", "BOP",
+  "BRUSH", "PERC", "SNAP", "SHAKER",
 ] as const;
 
 /** Build the flat list of all sample entries from SAMPLE_PACKS. */
 function buildSampleEntries(): SampleEntry[] {
   const entries: SampleEntry[] = [];
   for (const pack of SAMPLE_PACKS) {
+    // Single-file samples
     for (const name of pack.samples) {
       entries.push({
         id: `${pack.name}/${name}`,
@@ -110,6 +174,23 @@ function buildSampleEntries(): SampleEntry[] {
         category: deriveCategory(name),
         url: `/samples/${encodeURIComponent(pack.name)}/${encodeURIComponent(name)}.wav`,
       });
+    }
+    // Multi-sample entries (round-robin variations)
+    if (pack.multiSamples) {
+      for (const ms of pack.multiSamples) {
+        const urls: string[] = [];
+        for (let i = 1; i <= ms.count; i++) {
+          urls.push(`/samples/${encodeURIComponent(pack.name)}/${encodeURIComponent(ms.filePrefix + " - " + i)}.wav`);
+        }
+        entries.push({
+          id: `${pack.name}/${ms.name}`,
+          name: ms.name,
+          pack: pack.name,
+          category: deriveCategory(ms.name),
+          url: urls[0],
+          variantUrls: urls,
+        });
+      }
     }
   }
   return entries;

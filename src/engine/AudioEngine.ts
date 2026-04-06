@@ -126,6 +126,8 @@ function computeAccentWeights(
 export class AudioEngine {
   /** Pre-rendered audio buffers for synth presets + loaded samples. Keyed by sound ID. */
   private soundBuffers = new Map<string, AudioBuffer>();
+  /** Multiple buffers for multi-sample sounds (round-robin variations). */
+  private multiSoundBuffers = new Map<string, AudioBuffer[]>();
   /** Tracks in-flight sample loads to avoid duplicate fetches. */
   private sampleLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
   /** Whether init() has been called. */
@@ -297,14 +299,38 @@ export class AudioEngine {
 
     const promise = (async () => {
       try {
-        const response = await fetch(entry.url);
-        if (!response.ok) return null;
-        const arrayBuffer = await response.arrayBuffer();
         const ctx = Tone.getContext().rawContext;
         if (!ctx) return null;
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-        this.soundBuffers.set(soundId, audioBuffer);
-        return audioBuffer;
+
+        if (entry.variantUrls && entry.variantUrls.length > 1) {
+          // Multi-sample: load all variations in parallel
+          const buffers = await Promise.all(
+            entry.variantUrls.map(async (url) => {
+              try {
+                const response = await fetch(url);
+                if (!response.ok) return null;
+                const arrayBuffer = await response.arrayBuffer();
+                return await ctx.decodeAudioData(arrayBuffer);
+              } catch {
+                return null;
+              }
+            })
+          );
+          const validBuffers = buffers.filter((b): b is AudioBuffer => b !== null);
+          if (validBuffers.length === 0) return null;
+          this.multiSoundBuffers.set(soundId, validBuffers);
+          // Also set first buffer in soundBuffers for compatibility (preview, etc.)
+          this.soundBuffers.set(soundId, validBuffers[0]);
+          return validBuffers[0];
+        } else {
+          // Single sample: existing behavior
+          const response = await fetch(entry.url);
+          if (!response.ok) return null;
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          this.soundBuffers.set(soundId, audioBuffer);
+          return audioBuffer;
+        }
       } catch {
         return null;
       } finally {
@@ -316,9 +342,9 @@ export class AudioEngine {
     return promise;
   }
 
-  /** Ensure a sound is ready to play. For synth presets this is instant; for samples it loads the file. */
+  /** Ensure a sound is ready to play. For synth presets this is instant; for samples it loads the file(s). */
   async ensureSoundLoaded(soundId: string): Promise<void> {
-    if (this.soundBuffers.has(soundId)) return;
+    if (this.soundBuffers.has(soundId) || this.multiSoundBuffers.has(soundId)) return;
     if (isSampleSound(soundId)) {
       await this.loadSample(soundId);
     }
@@ -346,7 +372,11 @@ export class AudioEngine {
     vol: number,
   ): void {
     try {
-      const buffer = this.soundBuffers.get(sound);
+      // Multi-sample: pick a random variation for natural feel
+      const multiBufs = this.multiSoundBuffers.get(sound);
+      const buffer = multiBufs
+        ? multiBufs[Math.floor(Math.random() * multiBufs.length)]
+        : this.soundBuffers.get(sound);
       if (!buffer) return;
 
       const ctx = Tone.getContext().rawContext;
@@ -862,6 +892,7 @@ export class AudioEngine {
     this.clearAllParts();
     this.stop();
     this.soundBuffers.clear();
+    this.multiSoundBuffers.clear();
     try {
       if (this.bufferBridge) {
         this.bufferBridge.disconnect();
