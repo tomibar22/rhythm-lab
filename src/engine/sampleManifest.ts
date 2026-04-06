@@ -72,6 +72,16 @@ export const SAMPLE_PACKS: SamplePack[] = [
       "PERC1", "PERC2", "PERC3", "PERC4", "PERC5",
     ],
   },
+  {
+    name: "JAZZ",
+    samples: [
+      "KICK1", "KICK2",
+      "SNARE1", "SNARE2", "SNARE3", "SNARE4", "SNARE5",
+      "HIHAT1", "HIHAT2",
+      "BRUSH1", "BRUSH2",
+      "PERC1", "PERC2", "PERC3", "PERC4", "PERC5", "PERC6",
+    ],
+  },
 ];
 
 /** Derive category from a sample filename (e.g. "KICK1" → "KICK", "SNARE+CLAP" → "SNARE"). */
@@ -85,7 +95,7 @@ function deriveCategory(name: string): string {
 
 /** All known sample categories, in display order. */
 export const SAMPLE_CATEGORIES = [
-  "KICK", "SNARE", "HIHAT", "CYM", "PERC", "SNAP", "SHAKER",
+  "KICK", "SNARE", "HIHAT", "CYM", "BRUSH", "PERC", "SNAP", "SHAKER",
 ] as const;
 
 /** Build the flat list of all sample entries from SAMPLE_PACKS. */
