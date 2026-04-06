@@ -14,7 +14,12 @@ const HYDRATION_KEY = "rhythm-lab:hydrated-ids";
 // so they become fully editable user templates.
 // ─────────────────────────────────────────────
 
-/** Ensure all built-in templates exist in user storage (runs once per new built-in). */
+/**
+ * Ensure all built-in templates exist in user storage and stay up-to-date.
+ * - New built-ins are appended on first load.
+ * - Existing built-ins are silently updated to match the latest bundled data,
+ *   so template fixes ship to all users on next page load.
+ */
 function hydrateBuiltIns(): void {
   let hydratedIds: string[];
   try {
@@ -23,19 +28,28 @@ function hydrateBuiltIns(): void {
     hydratedIds = [];
   }
   const hydratedSet = new Set(hydratedIds);
-  const newTemplates = BUILT_IN_TEMPLATES.filter((t) => !hydratedSet.has(t.id));
-  if (newTemplates.length === 0) return;
-
   const userTemplates = getUserTemplatesRaw();
-  const existingIds = new Set(userTemplates.map((t) => t.id));
-  for (const t of newTemplates) {
-    if (!existingIds.has(t.id)) {
+  const existingMap = new Map(userTemplates.map((t, i) => [t.id, i]));
+
+  let changed = false;
+  for (const t of BUILT_IN_TEMPLATES) {
+    const idx = existingMap.get(t.id);
+    if (idx != null) {
+      // Update existing built-in in-place with latest bundled data
+      userTemplates[idx] = { ...t, savedAt: Date.now() };
+      changed = true;
+    } else if (!hydratedSet.has(t.id)) {
+      // New built-in — append
       userTemplates.push({ ...t, savedAt: Date.now() });
+      changed = true;
     }
     hydratedSet.add(t.id);
   }
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(userTemplates));
-  localStorage.setItem(HYDRATION_KEY, JSON.stringify([...hydratedSet]));
+
+  if (changed) {
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(userTemplates));
+    localStorage.setItem(HYDRATION_KEY, JSON.stringify([...hydratedSet]));
+  }
 }
 
 /** Raw read — no hydration guard (used by hydrateBuiltIns itself). */
